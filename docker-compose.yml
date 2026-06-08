@@ -1,0 +1,44 @@
+version: "3.9"
+
+# ChromaDB 运行在后端容器内，无需额外服务
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      - REWRITE_MODEL=${REWRITE_MODEL:-gpt-4o-mini}
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - CHROMA_COLLECTION=stock_filings
+      - CORS_ORIGINS=http://localhost:3000
+    volumes:
+      - chroma_data:/app/chroma_db     # ChromaDB 持久化
+      - sec_cache:/app/sec_cache       # SEC 数据缓存
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
+  sec_cache:

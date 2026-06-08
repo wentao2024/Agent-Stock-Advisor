@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip list *)",
+      "Bash(PYTHONPATH=. python *)",
+      "Bash(env)",
+      "Bash(printenv REWRITE_MODEL)",
+      "Bash(python3 -c \"import yfinance\")",
+      "Bash(pip3 install *)",
+      "Bash(python3 -m py_compile /Users/wentaoma/Projects/stock-advisor/stock-v3/backend/config.py /Users/wentaoma/Projects/stock-advisor/stock-v3/backend/agents/state.py /Users/wentaoma/Projects/stock-advisor/stock-v3/backend/agents/tools/market_data.py /Users/wentaoma/Projects/stock-advisor/stock-v3/backend/agents/nodes/technical_analyst.py /Users/wentaoma/Projects/stock-advisor/stock-v3/backend/agents/nodes/peer_benchmarker.py /Users/wentaoma/Projects/stock-advisor/stock-v3/backend/agents/nodes/data_fetcher.py /Users/wentaoma/Projects/stock-advisor/stock-v3/backend/agents/nodes/analyst.py /Users/wentaoma/Projects/stock-advisor/stock-v3/backend/agents/nodes/synthesizer.py /Users/wentaoma/Projects/stock-advisor/stock-v3/backend/agents/graph.py /Users/wentaoma/Projects/stock-advisor/stock-v3/backend/main.py)",
+      "Bash(npx tsc *)",
+      "Bash(node_modules/.bin/tsc --noEmit)"
+    ]
+  }
+}
