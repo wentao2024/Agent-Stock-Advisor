@@ -1,9 +1,10 @@
 """
-Data Fetcher 节点 — 直接函数调用方式
+Data Fetcher 节点 — 异步并行版
 
-直接调用 Python 函数收集数据，无 LLM 工具调用，
-彻底避免消息状态累积导致的 NameError/KeyError。
+使用 asyncio.gather + asyncio.to_thread 并行调用 4 个 yfinance 工具，
+将顺序执行的 ~8s 延迟压缩到 ~2s（取最慢单次调用时间）。
 """
+import asyncio
 import logging
 
 from agents.state import StockAnalysisState
@@ -18,117 +19,88 @@ from agents.tools.rag_tool import search_financial_knowledge_base
 logger = logging.getLogger(__name__)
 
 
-def data_fetcher_node(state: StockAnalysisState) -> dict:
-    ticker     = state.get("ticker", "AAPL")
-    company    = state.get("company_name", ticker)
+async def data_fetcher_node(state: StockAnalysisState) -> dict:
+    ticker      = state.get("ticker", "AAPL")
+    company     = state.get("company_name", ticker)
     include_rag = state.get("include_rag", True)
-    events     = list(state.get("events") or [])
+    events      = list(state.get("events") or [])
 
     events.append({
         "event_type": "agent_start",
-        "node": "data_fetcher",
-        "message": f"正在收集 {company}（{ticker}）的市场数据和财务指标...",
-        "data": {"ticker": ticker},
+        "node":       "data_fetcher",
+        "message":    f"并行拉取 {company}（{ticker}）市场数据（4 路并发）...",
+        "data":       {"ticker": ticker, "parallel": True},
     })
 
-    # 1. 核心财务指标
-    events.append({
-        "event_type": "tool_call", "node": "data_fetcher",
-        "message": "调用工具：get_key_metrics", "data": {},
-    })
-    try:
-        key_metrics = get_key_metrics.invoke({"ticker": ticker})
-        if "error" in key_metrics:
-            logger.warning(f"get_key_metrics 错误: {key_metrics.get('error')}")
-            key_metrics = {}
-        else:
-            events.append({
-                "event_type": "tool_result", "node": "data_fetcher",
-                "message": f"财务指标获取成功：PE={key_metrics.get('pe_ratio','N/A')} 营收增长={key_metrics.get('revenue_growth','N/A')}",
-                "data": {},
-            })
-    except Exception as e:
-        logger.error(f"get_key_metrics 失败: {e}")
-        key_metrics = {}
+    # ── 4 路并行：核心指标 / 股价历史 / 财务三表 / 新闻 ──────────
+    raw_metrics, raw_price, raw_financials, raw_news = await asyncio.gather(
+        asyncio.to_thread(get_key_metrics.invoke,          {"ticker": ticker}),
+        asyncio.to_thread(get_stock_price_history.invoke,  {"ticker": ticker, "period": "1y"}),
+        asyncio.to_thread(get_financial_statements.invoke, {"ticker": ticker}),
+        asyncio.to_thread(get_recent_news.invoke,          {"ticker": ticker, "max_items": 10}),
+        return_exceptions=True,
+    )
 
-    # 2. 股价历史
-    events.append({
-        "event_type": "tool_call", "node": "data_fetcher",
-        "message": "调用工具：get_stock_price_history", "data": {},
-    })
-    try:
-        price_data = get_stock_price_history.invoke({"ticker": ticker, "period": "1y"})
-        if "error" in price_data:
-            logger.warning(f"get_stock_price_history 错误: {price_data.get('error')}")
-            price_data = {}
-        else:
-            events.append({
-                "event_type": "tool_result", "node": "data_fetcher",
-                "message": f"股价数据获取成功：当前价 ${price_data.get('current_price','N/A')}",
-                "data": {},
-            })
-    except Exception as e:
-        logger.error(f"get_stock_price_history 失败: {e}")
-        price_data = {}
+    # ── 处理结果（统一错误降级逻辑）────────────────────────────
+    def _safe_dict(r, label: str) -> dict:
+        if isinstance(r, Exception):
+            logger.error(f"{label} 并发调用异常: {r}")
+            return {}
+        if isinstance(r, dict) and "error" in r:
+            logger.warning(f"{label} 返回错误: {r['error']}")
+            return {}
+        return r or {}
 
-    # 3. 财务三表
-    events.append({
-        "event_type": "tool_call", "node": "data_fetcher",
-        "message": "调用工具：get_financial_statements", "data": {},
-    })
-    try:
-        financial_statements = get_financial_statements.invoke({"ticker": ticker})
-        if "error" in financial_statements:
-            logger.warning(f"get_financial_statements 错误: {financial_statements.get('error')}")
-            financial_statements = {}
-        else:
-            events.append({
-                "event_type": "tool_result", "node": "data_fetcher",
-                "message": "财务三表获取成功（损益表/资产负债表/现金流量表）",
-                "data": {},
-            })
-    except Exception as e:
-        logger.error(f"get_financial_statements 失败: {e}")
-        financial_statements = {}
+    def _safe_list(r, label: str) -> list:
+        if isinstance(r, Exception):
+            logger.error(f"{label} 并发调用异常: {r}")
+            return []
+        if isinstance(r, list) and r and "error" in r[0]:
+            logger.warning(f"{label} 返回错误: {r[0]['error']}")
+            return []
+        return r or []
 
-    # 4. 最新新闻
-    events.append({
-        "event_type": "tool_call", "node": "data_fetcher",
-        "message": "调用工具：get_recent_news", "data": {},
-    })
-    try:
-        recent_news = get_recent_news.invoke({"ticker": ticker, "max_items": 10})
-        if isinstance(recent_news, list) and recent_news and "error" in recent_news[0]:
-            recent_news = []
-        else:
-            events.append({
-                "event_type": "tool_result", "node": "data_fetcher",
-                "message": f"新闻获取成功：{len(recent_news)} 条最新报道",
-                "data": {},
-            })
-    except Exception as e:
-        logger.error(f"get_recent_news 失败: {e}")
-        recent_news = []
+    key_metrics          = _safe_dict(raw_metrics,    "get_key_metrics")
+    price_data           = _safe_dict(raw_price,      "get_stock_price_history")
+    financial_statements = _safe_dict(raw_financials, "get_financial_statements")
+    recent_news          = _safe_list(raw_news,       "get_recent_news")
 
-    # 5. ChromaDB RAG 检索（可选）
+    # ── 并发完成后汇报 ──────────────────────────────────────────
+    if key_metrics:
+        events.append({
+            "event_type": "tool_result", "node": "data_fetcher",
+            "message": (
+                f"4路数据拉取完成 — "
+                f"PE={key_metrics.get('pe_ratio','N/A')} "
+                f"股价=${price_data.get('current_price','N/A')} "
+                f"新闻{len(recent_news)}条"
+            ),
+            "data": {},
+        })
+    else:
+        events.append({
+            "event_type": "tool_result", "node": "data_fetcher",
+            "message": "部分数据拉取失败，降级继续分析", "data": {},
+        })
+
+    # ── ChromaDB RAG 检索（可选，串行）─────────────────────────
     rag_contexts = list(state.get("rag_contexts") or [])
     if include_rag:
         events.append({
             "event_type": "tool_call", "node": "data_fetcher",
-            "message": "调用工具：search_financial_knowledge_base（ChromaDB）",
-            "data": {},
+            "message": "ChromaDB RAG 检索（SEC/yfinance 语料）", "data": {},
         })
         for query in ["risk factors supply chain competition", "revenue growth strategy"]:
             try:
-                result = search_financial_knowledge_base.invoke({
-                    "query": query, "ticker": ticker
-                })
+                result = await asyncio.to_thread(
+                    search_financial_knowledge_base.invoke,
+                    {"query": query, "ticker": ticker},
+                )
                 if result and "not initialized" not in result and "No relevant" not in result:
                     rag_contexts.append(result)
                     events.append({
                         "event_type": "tool_result", "node": "data_fetcher",
-                        "message": "ChromaDB RAG 检索完成",
-                        "data": {},
+                        "message": "ChromaDB RAG 检索完成", "data": {},
                     })
                     break
             except Exception as e:
@@ -144,5 +116,3 @@ def data_fetcher_node(state: StockAnalysisState) -> dict:
         "events":               events,
         "messages":             [],
     }
-
-

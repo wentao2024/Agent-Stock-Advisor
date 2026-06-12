@@ -1,7 +1,30 @@
 version: "3.9"
 
-# ChromaDB 运行在后端容器内，无需额外服务
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: stockadvisor
+      POSTGRES_PASSWORD: stockadvisor
+      POSTGRES_DB: stockadvisor
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockadvisor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -16,9 +39,19 @@ services:
       - CHROMA_PERSIST_DIR=/app/chroma_db
       - CHROMA_COLLECTION=stock_filings
       - CORS_ORIGINS=http://localhost:3000
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://stockadvisor:stockadvisor@postgres:5432/stockadvisor
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-stock-advisor}
     volumes:
-      - chroma_data:/app/chroma_db     # ChromaDB 持久化
-      - sec_cache:/app/sec_cache       # SEC 数据缓存
+      - chroma_data:/app/chroma_db
+      - sec_cache:/app/sec_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
@@ -42,3 +75,4 @@ services:
 volumes:
   chroma_data:
   sec_cache:
+  pg_data:
