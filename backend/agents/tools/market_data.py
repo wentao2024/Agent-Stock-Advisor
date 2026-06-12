@@ -1,5 +1,6 @@
 """yfinance 市场数据工具（5个 @tool）"""
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 import pandas as pd
 import yfinance as yf
@@ -30,7 +31,7 @@ def get_stock_price_history(ticker: str, period: str = "1y") -> dict:
         for label, days in [("1m", 21), ("3m", 63), ("6m", 126), ("1y", 252)]:
             if len(hist) >= days:
                 past = hist["Close"].iloc[-days]
-                if past and past != 0:
+                if past is not None and not pd.isna(past) and past != 0:
                     perf[f"pct_{label}"] = round((hist["Close"].iloc[-1] - past) / past * 100, 2)
         ohlcv = []
         for _, row in hist.tail(30).reset_index().iterrows():
@@ -143,30 +144,43 @@ def get_recent_news(ticker: str, max_items: int = 10) -> list[dict]:
         return [{"error": str(e)}]
 
 
+def _fetch_peer_info(peer: str) -> dict | None:
+    try:
+        pi = yf.Ticker(peer).info
+        return {
+            "ticker": peer,
+            "name": pi.get("longName", peer)[:25],
+            "pe": _sf(pi.get("trailingPE")),
+            "revenue_growth": _sf(pi.get("revenueGrowth")),
+            "net_margin": _sf(pi.get("profitMargins")),
+        }
+    except Exception:
+        return None
+
+
 @tool
 def get_peer_comparison(ticker: str) -> dict:
     """获取同行业关键估值指标对比"""
     PEERS = {
         "AAPL": ["MSFT", "GOOGL", "META"], "MSFT": ["AAPL", "GOOGL", "AMZN"],
         "GOOGL": ["MSFT", "META", "AMZN"], "NVDA": ["AMD", "INTC", "AVGO"],
-        "TSLA": ["F", "GM", "NIO"], "META": ["SNAP", "PINS", "GOOGL"],
-        "AMZN": ["WMT", "SHOP", "BABA"], "JPM": ["BAC", "GS", "MS"],
+        "TSLA": ["F", "GM", "NIO"],        "META": ["SNAP", "PINS", "GOOGL"],
+        "AMZN": ["WMT", "SHOP", "BABA"],   "JPM": ["BAC", "GS", "MS"],
+        "NFLX": ["DIS", "PARA", "WBD"],    "AMD":  ["NVDA", "INTC", "AVGO"],
+        "INTC": ["AMD", "NVDA", "QCOM"],   "V":    ["MA", "AXP", "PYPL"],
+        "WMT":  ["COST", "TGT", "AMZN"],   "DIS":  ["NFLX", "PARA", "WBD"],
     }
     try:
         info = yf.Ticker(ticker).info
+        peer_list = PEERS.get(ticker.upper(), [])[:3]
         peers_data = []
-        for peer in PEERS.get(ticker, [])[:3]:
-            try:
-                pi = yf.Ticker(peer).info
-                peers_data.append({
-                    "ticker": peer,
-                    "name": pi.get("longName", peer)[:25],
-                    "pe": _sf(pi.get("trailingPE")),
-                    "revenue_growth": _sf(pi.get("revenueGrowth")),
-                    "net_margin": _sf(pi.get("profitMargins")),
-                })
-            except Exception:
-                pass
+        if peer_list:
+            with ThreadPoolExecutor(max_workers=len(peer_list)) as executor:
+                futures = {executor.submit(_fetch_peer_info, p): p for p in peer_list}
+                for future in as_completed(futures):
+                    result = future.result()
+                    if result is not None:
+                        peers_data.append(result)
         return {
             "ticker": ticker,
             "sector": info.get("sector", ""), "industry": info.get("industry", ""),

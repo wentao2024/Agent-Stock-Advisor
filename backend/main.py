@@ -1,13 +1,18 @@
 """
-Stock Advisor API v3
+Stock Advisor API v4
 - 输入：公司名称（支持中英文、ticker 均可）
 - LLM：OpenAI gpt-4o（唯一提供商）
 - 向量库：ChromaDB（本地，无需额外服务）
+- 短期记忆：Redis（LangGraph Checkpointer，支持断点续传）
+- 长期记忆：PostgreSQL（历史分析报告持久化）
 - 输出：SSE 流式 + 可下载 txt 报告（全中文）
 """
+import contextlib
 import json
 import logging
+import os
 import time
+import uuid
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Optional
@@ -15,9 +20,10 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-from agents.graph import compiled_graph
+import db
+from agents.graph import build_graph
 from agents.tools.rag_tool import set_retriever
 from config import get_settings
 from rag.indexer import company_name_to_ticker, get_retriever, index_ticker
@@ -29,19 +35,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# 最近一次分析结果缓存（TTL = 10 分钟），供下载接口直接复用
-_result_cache: dict[str, tuple[float, dict]] = {}
+# 编译好的 LangGraph 图（lifespan 中初始化）
+_graph = None
+
+# 内存缓存（PostgreSQL 不可用时的降级方案）
+_fallback_cache: dict[str, tuple[float, dict]] = {}
 _CACHE_TTL = 600
-
-def _cache_put(ticker: str, rec: dict) -> None:
-    _result_cache[ticker] = (time.time(), rec)
-
-def _cache_get(ticker: str) -> Optional[dict]:
-    entry = _result_cache.get(ticker)
-    if entry and time.time() - entry[0] < _CACHE_TTL:
-        return entry[1]
-    _result_cache.pop(ticker, None)
-    return None
 
 
 def _make_initial_state(ticker: str, include_rag: bool, horizon: str = "medium") -> dict:
@@ -67,29 +66,105 @@ def _make_initial_state(ticker: str, include_rag: bool, horizon: str = "medium")
         "data_fetch_complete":    False,
         "analysis_complete":      False,
         "confidence_score":       0.0,
+        "reflection_count":       0,
+        "reflection_critique":    "",
         "recommendation":         None,
         "error":                  None,
         "events":                 [],
     }
 
 
+def _make_config(thread_id: str) -> dict:
+    return {
+        "recursion_limit": 50,
+        "configurable": {"thread_id": thread_id},
+    }
+
+
+def _get_graph():
+    if _graph is None:
+        raise HTTPException(503, "服务未就绪，请稍后重试")
+    return _graph
+
+
+async def _save_report(ticker: str, company_name: str, horizon: str,
+                       confidence: float, rec: dict) -> None:
+    if db._pool:
+        await db.save_report(ticker, company_name, horizon, confidence, rec)
+    else:
+        _fallback_cache[ticker] = (time.time(), rec)
+
+
+async def _get_latest_report(ticker: str) -> Optional[dict]:
+    if db._pool:
+        return await db.get_latest_report(ticker, _CACHE_TTL)
+    entry = _fallback_cache.get(ticker)
+    if entry and time.time() - entry[0] < _CACHE_TTL:
+        return entry[1]
+    _fallback_cache.pop(ticker, None)
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("🚀 Stock Advisor v3（ChromaDB）启动中...")
-    try:
-        retriever = get_retriever()
-        set_retriever(retriever)
-        logger.info("✅ ChromaDB 检索器初始化完成")
-    except Exception as e:
-        logger.warning(f"ChromaDB 初始化警告：{e} — RAG 功能已禁用")
-    yield
+    global _graph
+    logger.info("🚀 Stock Advisor（LangGraph + Redis Checkpointer + PostgreSQL）启动中...")
+
+    async with contextlib.AsyncExitStack() as stack:
+        # ── Redis Checkpointer（可选）────────────────────────────
+        checkpointer = None
+        if settings.redis_url:
+            try:
+                from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+                checkpointer = await stack.enter_async_context(
+                    AsyncRedisSaver.from_url(settings.redis_url)
+                )
+                await checkpointer.setup()
+                logger.info("✅ Redis Checkpointer 已启用（断点续传支持）")
+            except Exception as e:
+                logger.warning(f"⚠️  Redis 不可用，以无持久化模式运行: {e}")
+                checkpointer = None
+
+        # 编译 LangGraph 图
+        _graph = build_graph(checkpointer)
+        logger.info(
+            f"✅ LangGraph 图已编译（checkpointer={'Redis' if checkpointer else '无'}）"
+        )
+
+        # ── PostgreSQL（可选）────────────────────────────────────
+        if settings.database_url:
+            try:
+                await db.init_db(settings.database_url)
+                logger.info("✅ PostgreSQL 连接池已就绪（历史报告持久化）")
+            except Exception as e:
+                logger.warning(f"⚠️  PostgreSQL 不可用，使用内存缓存: {e}")
+
+        # ── LangSmith 追踪（可选）───────────────────────────────
+        if settings.langchain_tracing_v2.lower() == "true" and settings.langchain_api_key:
+            os.environ["LANGCHAIN_TRACING_V2"] = "true"
+            os.environ["LANGCHAIN_API_KEY"]    = settings.langchain_api_key
+            os.environ["LANGCHAIN_PROJECT"]    = settings.langchain_project
+            os.environ["LANGCHAIN_ENDPOINT"]   = settings.langchain_endpoint
+            logger.info(f"✅ LangSmith tracing 已启用：project={settings.langchain_project}")
+
+        # ── ChromaDB 检索器────────────────────────────────────
+        try:
+            retriever = get_retriever()
+            set_retriever(retriever)
+            logger.info("✅ ChromaDB 检索器初始化完成")
+        except Exception as e:
+            logger.warning(f"ChromaDB 初始化警告：{e} — RAG 功能已禁用")
+
+        yield
+
+    await db.close_db()
     logger.info("👋 服务已关闭")
 
 
 app = FastAPI(
     title="Stock Advisor AI",
-    description="LangGraph 多 Agent 股票分析（OpenAI + ChromaDB）",
-    version="3.0.0",
+    description="LangGraph 多 Agent 股票分析（Redis Checkpointer + PostgreSQL + LangSmith）",
+    version="4.0.0",
     lifespan=lifespan,
 )
 app.add_middleware(
@@ -106,6 +181,13 @@ class AnalysisRequest(BaseModel):
     include_rag: bool = True
     horizon: str = "medium"
 
+    @field_validator("horizon")
+    @classmethod
+    def validate_horizon(cls, v: str) -> str:
+        if v not in ("short", "medium", "long"):
+            raise ValueError("horizon 必须是 short、medium 或 long")
+        return v
+
 
 # ── 健康检查 ──────────────────────────────────────────────────
 
@@ -115,6 +197,8 @@ async def health():
         "status": "正常",
         "model": settings.openai_model,
         "vector_db": "ChromaDB（本地）",
+        "checkpointer": "Redis" if settings.redis_url else "无",
+        "persistence": "PostgreSQL" if db._pool else "内存",
     }
 
 
@@ -128,7 +212,6 @@ async def resolve(name: str = Query(...)):
 
 @app.post("/api/index/{name_or_ticker}")
 async def index_company(name_or_ticker: str):
-    """将公司数据索引到 ChromaDB（建议分析前先运行）"""
     ticker = company_name_to_ticker(name_or_ticker)
     try:
         result = await index_ticker(ticker)
@@ -142,29 +225,41 @@ async def index_company(name_or_ticker: str):
 @app.post("/api/analyze/stream")
 async def analyze_stream(req: AnalysisRequest):
     """SSE 流式分析，实时推送 Agent 推理过程"""
+    graph   = _get_graph()
     ticker  = company_name_to_ticker(req.company_name)
     initial = _make_initial_state(ticker, req.include_rag, req.horizon)
 
     async def gen():
-        # 每个节点返回的是"截至目前的完整 events 列表"，用 emitted 追踪已推送数量，
-        # 每次只推送新增部分，避免历史事件重复出现
+        thread_id = str(uuid.uuid4())
+        # 推送 session_start，让前端可以保存 thread_id 用于可能的重连
+        yield (
+            f"data: {json.dumps({'event_type':'session_start','thread_id':thread_id,'ticker':ticker}, ensure_ascii=False)}\n\n"
+        )
+
         emitted = 0
+        last_rec = None
+        last_rec_node = None
         try:
-            async for chunk in compiled_graph.astream(
-                initial,
-                config={"recursion_limit": 50},
-            ):
+            async for chunk in graph.astream(initial, config=_make_config(thread_id)):
                 for node_name, update in chunk.items():
                     all_events = update.get("events") or []
                     for ev in all_events[emitted:]:
                         yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
                     emitted = len(all_events)
+
                     if update.get("recommendation"):
-                        rec = update["recommendation"]
-                        _cache_put(ticker, rec)
-                        yield (
-                            f"data: {json.dumps({'event_type':'final_recommendation','node':node_name,'message':'分析完成','data':rec}, ensure_ascii=False)}\n\n"
-                        )
+                        last_rec = update["recommendation"]
+                        last_rec_node = node_name
+
+            # 只在图执行完毕后保存最终结果，避免反思循环中多次写库
+            if last_rec is not None:
+                confidence = last_rec.get("confidence", 0.0)
+                await _save_report(
+                    ticker, req.company_name, req.horizon, confidence, last_rec
+                )
+                yield (
+                    f"data: {json.dumps({'event_type':'final_recommendation','node':last_rec_node,'message':'分析完成','data':last_rec}, ensure_ascii=False)}\n\n"
+                )
         except Exception as e:
             logger.error(f"图执行错误：{e}", exc_info=True)
             yield f"data: {json.dumps({'event_type':'error','node':'graph','message':str(e),'data':{}}, ensure_ascii=False)}\n\n"
@@ -181,14 +276,23 @@ async def analyze_stream(req: AnalysisRequest):
 @app.post("/api/analyze")
 async def analyze(req: AnalysisRequest):
     """非流式分析（测试/批量处理用）"""
+    graph   = _get_graph()
     ticker  = company_name_to_ticker(req.company_name)
     initial = _make_initial_state(ticker, req.include_rag, req.horizon)
+    thread_id = str(uuid.uuid4())
     try:
-        final = await compiled_graph.ainvoke(initial, config={"recursion_limit": 30})
+        final = await graph.ainvoke(initial, config=_make_config(thread_id))
+        rec   = final.get("recommendation")
+        if rec:
+            await _save_report(
+                ticker, req.company_name, req.horizon,
+                rec.get("confidence", 0.0), rec
+            )
         return {
             "company_name":   req.company_name,
             "ticker":         ticker,
-            "recommendation": final.get("recommendation"),
+            "thread_id":      thread_id,
+            "recommendation": rec,
             "error":          final.get("error"),
         }
     except Exception as e:
@@ -199,21 +303,24 @@ async def analyze(req: AnalysisRequest):
 
 @app.post("/api/analyze/download")
 async def analyze_download(req: AnalysisRequest):
-    """返回可下载的中文 txt 报告；优先复用 10 分钟内的流式分析缓存，避免重复分析"""
+    """返回可下载的中文 txt 报告；优先复用 10 分钟内的分析缓存，避免重复分析"""
+    graph  = _get_graph()
     ticker = company_name_to_ticker(req.company_name)
 
-    # 优先使用流式分析留下的缓存结果
-    rec = _cache_get(ticker)
+    rec = await _get_latest_report(ticker)
 
     if rec is None:
-        # 缓存未命中时才重新运行分析
-        initial = _make_initial_state(ticker, req.include_rag, req.horizon)
+        initial   = _make_initial_state(ticker, req.include_rag, req.horizon)
+        thread_id = str(uuid.uuid4())
         try:
-            final = await compiled_graph.ainvoke(initial, config={"recursion_limit": 50})
+            final = await graph.ainvoke(initial, config=_make_config(thread_id))
             rec   = final.get("recommendation")
             if not rec:
                 raise HTTPException(500, f"分析失败：{final.get('error','未知错误')}")
-            _cache_put(ticker, rec)
+            await _save_report(
+                ticker, req.company_name, req.horizon,
+                rec.get("confidence", 0.0), rec
+            )
         except HTTPException:
             raise
         except Exception as e:
@@ -228,6 +335,16 @@ async def analyze_download(req: AnalysisRequest):
             "Content-Type": "text/plain; charset=utf-8",
         },
     )
+
+
+# ── 历史分析记录 ──────────────────────────────────────────────
+
+@app.get("/api/reports/{ticker}")
+async def get_reports(ticker: str, limit: int = Query(10, ge=1, le=50)):
+    """查询某 ticker 的历史分析记录（仅 PostgreSQL 模式下有数据）"""
+    ticker = ticker.upper()
+    history = await db.get_report_history(ticker, limit)
+    return {"ticker": ticker, "count": len(history), "reports": history}
 
 
 def _format_txt(rec: dict, company_name: str, ticker: str) -> str:
