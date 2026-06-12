@@ -15,16 +15,18 @@ from agents.state import StockAnalysisState
 from config import get_settings
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
-# LLM 实例在模块级别创建，避免每次调用重复初始化
-_llm = ChatOpenAI(
-    model=settings.openai_model,
-    api_key=settings.openai_api_key,
-    temperature=0.1,
-)
+_llm: ChatOpenAI | None = None
 
-ANALYST_SYS = (
+
+def _get_llm() -> ChatOpenAI:
+    global _llm
+    if _llm is None:
+        s = get_settings()
+        _llm = ChatOpenAI(model=s.openai_model, api_key=s.openai_api_key, temperature=0.1)
+    return _llm
+
+ANALYST_SYS_BASE = (
     "你是顶级卖方研究分析师，专注基本面分析。"
     "请用中文回答，每个分析模块用3~5句话，简洁有力，附上数据依据。"
 )
@@ -33,7 +35,7 @@ ANALYST_SYS = (
 async def _llm_async(system: str, user: str) -> tuple[str, dict]:
     """返回 (content, usage_metadata)"""
     try:
-        resp = await _llm.ainvoke([
+        resp = await _get_llm().ainvoke([
             SystemMessage(content=system),
             HumanMessage(content=user),
         ])
@@ -45,24 +47,40 @@ async def _llm_async(system: str, user: str) -> tuple[str, dict]:
 
 
 async def analyst_node(state: StockAnalysisState) -> dict:
-    ticker      = state.get("ticker", "UNKNOWN")
-    company     = state.get("company_name", ticker)
-    metrics     = state.get("key_metrics") or {}
-    price_data  = state.get("price_data") or {}
-    financials  = state.get("financial_statements") or {}
-    news        = state.get("recent_news") or []
-    rag         = state.get("rag_contexts") or []
-    tech        = state.get("technical_analysis") or {}
-    peers       = state.get("peer_comparison") or {}
-    horizon     = state.get("horizon", "medium")
-    events      = list(state.get("events") or [])
+    ticker             = state.get("ticker", "UNKNOWN")
+    company            = state.get("company_name", ticker)
+    metrics            = state.get("key_metrics") or {}
+    price_data         = state.get("price_data") or {}
+    financials         = state.get("financial_statements") or {}
+    news               = state.get("recent_news") or []
+    rag                = state.get("rag_contexts") or []
+    tech               = state.get("technical_analysis") or {}
+    peers              = state.get("peer_comparison") or {}
+    horizon            = state.get("horizon", "medium")
+    events             = list(state.get("events") or [])
+    reflection_critique = state.get("reflection_critique") or ""
+    reflection_count   = state.get("reflection_count") or 0
 
-    events.append({
-        "event_type": "agent_start",
-        "node": "analyst",
-        "message": f"启动多跳推理分析：{company}（{ticker}）",
-        "data": {"steps": 5, "parallel": "1+2+3"},
-    })
+    # 如果携带反思建议，将其注入系统提示，引导更深度分析
+    if reflection_critique:
+        ANALYST_SYS = (
+            ANALYST_SYS_BASE
+            + f"\n\n【前轮质量审核发现的不足，本轮请重点补强】\n{reflection_critique}"
+        )
+        events.append({
+            "event_type": "agent_start",
+            "node":       "analyst",
+            "message":    f"根据反思建议重新深化分析（第 {reflection_count} 次迭代）：{company}（{ticker}）",
+            "data":       {"steps": 5, "parallel": "1+2+3", "reflection_count": reflection_count},
+        })
+    else:
+        ANALYST_SYS = ANALYST_SYS_BASE
+        events.append({
+            "event_type": "agent_start",
+            "node":       "analyst",
+            "message":    f"启动多跳推理分析：{company}（{ticker}）",
+            "data":       {"steps": 5, "parallel": "1+2+3"},
+        })
 
     quarterly_rev = {}
     try:
