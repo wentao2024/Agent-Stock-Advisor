@@ -13,7 +13,17 @@ from models.schemas import DataSource, FinancialMetrics, StockRecommendation
 from config import get_settings
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
+
+_llm: ChatOpenAI | None = None
+
+
+def _get_llm() -> ChatOpenAI:
+    global _llm
+    if _llm is None:
+        s = get_settings()
+        _llm = ChatOpenAI(model=s.openai_model, api_key=s.openai_api_key, temperature=0)
+    return _llm
+
 
 SYS = """你是投资银行首席股票分析师。请基于以下分析生成完整的结构化投资报告。
 
@@ -49,13 +59,8 @@ async def synthesizer_node(state: StockAnalysisState) -> dict:
         "data": {},
     })
 
-    llm = ChatOpenAI(
-        model=settings.openai_model,
-        api_key=settings.openai_api_key,
-        temperature=0,
-    )
     # include_raw=True 让我们能获取原始 AIMessage 以读取 usage_metadata
-    structured_llm = llm.with_structured_output(StockRecommendation, include_raw=True)
+    structured_llm = _get_llm().with_structured_output(StockRecommendation, include_raw=True)
 
     current_price = price_data.get("current_price", 0.0) or 0.0
 

@@ -173,7 +173,7 @@ def technical_analyst_node(state: StockAnalysisState) -> dict:
     # ── 综合多空计分 ──────────────────────────────────────────────
     bull = 0
     bear = 0
-    if rsi:
+    if rsi is not None:
         bull += (1 if rsi > 50 else 0)
         bear += (1 if rsi < 50 else 0)
     if macd_hist is not None:
