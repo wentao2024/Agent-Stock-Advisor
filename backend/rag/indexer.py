@@ -42,7 +42,7 @@ COMPANY_MAP = {
     "johnson": "JNJ", "walmart": "WMT", "visa": "V",
     "mastercard": "MA", "salesforce": "CRM", "oracle": "ORCL",
     "intel": "INTC", "amd": "AMD", "qualcomm": "QCOM",
-    "broadcom": "AVGO", "netflix": "NFLX", "disney": "DIS",
+    "broadcom": "AVGO", "disney": "DIS",
     "boeing": "BA", "coca cola": "KO", "pepsi": "PEP",
     "pepsico": "PEP", "exxon": "XOM", "chevron": "CVX",
     "berkshire": "BRK-B", "uber": "UBER", "lyft": "LYFT",
@@ -357,7 +357,7 @@ async def index_ticker(ticker: str) -> dict:
     logger.info(f"Starting ingestion for {ticker}...")
 
     # 1. 收集数据
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     yf_text = await loop.run_in_executor(None, _collect_yfinance_text, ticker)
     sec_text = await loop.run_in_executor(None, _collect_sec_text, ticker)
 
