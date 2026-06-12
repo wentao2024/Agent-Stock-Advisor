@@ -71,7 +71,7 @@ def peer_benchmarker_node(state: StockAnalysisState) -> dict:
         vs_peers      = {}
         summary_parts = []
 
-        if own_pe and peer_avg_pe:
+        if own_pe is not None and peer_avg_pe is not None:
             premium = (own_pe - peer_avg_pe) / peer_avg_pe
             vs_peers["pe_vs_peers"] = round(premium, 4)
             if premium > 0.2:

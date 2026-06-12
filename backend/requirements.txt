@@ -5,6 +5,7 @@ langchain-openai>=0.2.0
 langchain-community>=0.3.0
 langchain-core>=0.3.0
 langchain-text-splitters>=0.3.0
+langsmith>=0.1.0
 
 # ── OpenAI（唯一 LLM 提供商）─────────────────────────────────
 openai>=1.50.0
@@ -32,6 +33,10 @@ python-multipart>=0.0.9
 pydantic>=2.5.0
 pydantic-settings>=2.2.0
 python-dotenv>=1.0.0
+
+# ── State & Memory ────────────────────────────────────────────
+langgraph-checkpoint-redis>=0.0.1
+asyncpg>=0.29.0
 
 # ── Utils ─────────────────────────────────────────────────────
 tenacity>=8.0.0
