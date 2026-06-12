@@ -15,6 +15,18 @@ class Settings(BaseSettings):
     # ── Agent 参数 ─────────────────────────────────────────────
     rag_top_k: int = 5
 
+    # ── LangSmith（可选，用于 Agent 执行轨迹可视化）──────────
+    langchain_tracing_v2: str = "false"
+    langchain_api_key: str = ""
+    langchain_project: str = "stock-advisor"
+    langchain_endpoint: str = "https://api.smith.langchain.com"
+
+    # ── Redis（LangGraph Checkpointer，可选）────────────────────
+    redis_url: str = ""
+
+    # ── PostgreSQL（历史报告持久化，可选）──────────────────────
+    database_url: str = ""
+
     # ── CORS ──────────────────────────────────────────────────
     cors_origins: str = "http://localhost:3000"
 
