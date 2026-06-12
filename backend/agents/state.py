@@ -45,5 +45,9 @@ class StockAnalysisState(TypedDict, total=False):
     recommendation: Optional[dict]
     error: Optional[str]
 
+    # Reflection loop（自我反思）
+    reflection_count: int
+    reflection_critique: str
+
     # SSE 事件日志
     events: list
