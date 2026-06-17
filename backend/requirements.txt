@@ -11,10 +11,6 @@ langsmith>=0.1.0
 openai>=1.50.0
 tiktoken>=0.7.0
 
-# ── Vector DB：ChromaDB（本地运行，无需额外服务）─────────────
-chromadb>=0.5.0
-langchain-chroma>=0.1.0
-
 # ── Financial Data ────────────────────────────────────────────
 yfinance>=0.2.40
 pandas>=2.0.0
