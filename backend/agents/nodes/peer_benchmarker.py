@@ -55,7 +55,7 @@ def peer_benchmarker_node(state: StockAnalysisState) -> dict:
             })
             return {"peer_comparison": default, "events": events}
 
-        # 计算同行均值
+        # 计算同行 均值
         valid_pe     = [p["pe"] for p in peers if p.get("pe") is not None]
         valid_growth = [p["revenue_growth"] for p in peers if p.get("revenue_growth") is not None]
         valid_margin = [p["net_margin"] for p in peers if p.get("net_margin") is not None]
