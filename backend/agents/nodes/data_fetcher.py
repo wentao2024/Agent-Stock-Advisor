@@ -14,16 +14,14 @@ from agents.tools.market_data import (
     get_financial_statements,
     get_recent_news,
 )
-from agents.tools.rag_tool import search_financial_knowledge_base
 
 logger = logging.getLogger(__name__)
 
 
 async def data_fetcher_node(state: StockAnalysisState) -> dict:
-    ticker      = state.get("ticker", "AAPL")
-    company     = state.get("company_name", ticker)
-    include_rag = state.get("include_rag", True)
-    events      = list(state.get("events") or [])
+    ticker  = state.get("ticker", "AAPL")
+    company = state.get("company_name", ticker)
+    events  = list(state.get("events") or [])
 
     events.append({
         "event_type": "agent_start",
@@ -83,35 +81,11 @@ async def data_fetcher_node(state: StockAnalysisState) -> dict:
             "message": "部分数据拉取失败，降级继续分析", "data": {},
         })
 
-    # ── ChromaDB RAG 检索（可选，串行）─────────────────────────
-    rag_contexts = list(state.get("rag_contexts") or [])
-    if include_rag:
-        events.append({
-            "event_type": "tool_call", "node": "data_fetcher",
-            "message": "ChromaDB RAG 检索（SEC/yfinance 语料）", "data": {},
-        })
-        for query in ["risk factors supply chain competition", "revenue growth strategy"]:
-            try:
-                result = await asyncio.to_thread(
-                    search_financial_knowledge_base.invoke,
-                    {"query": query, "ticker": ticker},
-                )
-                if result and "not initialized" not in result and "No relevant" not in result:
-                    rag_contexts.append(result)
-                    events.append({
-                        "event_type": "tool_result", "node": "data_fetcher",
-                        "message": "ChromaDB RAG 检索完成", "data": {},
-                    })
-                    break
-            except Exception as e:
-                logger.warning(f"RAG 检索失败: {e}")
-
     return {
         "key_metrics":          key_metrics,
         "price_data":           price_data,
         "financial_statements": financial_statements,
         "recent_news":          recent_news,
-        "rag_contexts":         rag_contexts,
         "data_fetch_complete":  True,
         "events":               events,
         "messages":             [],
