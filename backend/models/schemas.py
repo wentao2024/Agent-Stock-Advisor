@@ -33,7 +33,7 @@ class ReasoningStep(BaseModel):
 
 
 class DataSource(BaseModel):
-    source_type: Literal["yfinance", "sec_edgar", "news", "chromadb_rag"]
+    source_type: Literal["yfinance", "sec_edgar", "news"]
     name: str
     relevance: str
 
@@ -61,5 +61,4 @@ class StockRecommendation(BaseModel):
 
 class AnalysisRequest(BaseModel):
     company_name: str
-    include_rag: bool = True
     horizon: str = "medium"
