@@ -2,7 +2,6 @@
 Stock Advisor API v4
 - 输入：公司名称（支持中英文、ticker 均可）
 - LLM：OpenAI gpt-4o（唯一提供商）
-- 向量库：ChromaDB（本地，无需额外服务）
 - 短期记忆：Redis（LangGraph Checkpointer，支持断点续传）
 - 长期记忆：PostgreSQL（历史分析报告持久化）
 - 输出：SSE 流式 + 可下载 txt 报告（全中文）
@@ -24,9 +23,8 @@ from pydantic import BaseModel, field_validator
 
 import db
 from agents.graph import build_graph
-from agents.tools.rag_tool import set_retriever
 from config import get_settings
-from rag.indexer import company_name_to_ticker, get_retriever, index_ticker
+from ticker_resolver import company_name_to_ticker
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,19 +41,17 @@ _fallback_cache: dict[str, tuple[float, dict]] = {}
 _CACHE_TTL = 600
 
 
-def _make_initial_state(ticker: str, include_rag: bool, horizon: str = "medium") -> dict:
+def _make_initial_state(ticker: str, horizon: str = "medium") -> dict:
     """显式初始化所有 state 字段，彻底防止 KeyError"""
     return {
         "ticker":                 ticker,
         "company_name":           ticker,
-        "include_rag":            include_rag,
         "horizon":                horizon,
         "messages":               [],
         "price_data":             {},
         "financial_statements":   {},
         "key_metrics":            {},
         "recent_news":            [],
-        "rag_contexts":           [],
         "technical_analysis":     {},
         "peer_comparison":        {},
         "revenue_analysis":       "",
@@ -108,7 +104,7 @@ async def _get_latest_report(ticker: str) -> Optional[dict]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _graph
-    logger.info("🚀 Stock Advisor（LangGraph + Redis Checkpointer + PostgreSQL）启动中...")
+    logger.info("Stock Advisor（LangGraph + Redis Checkpointer + PostgreSQL）启动中...")
 
     async with contextlib.AsyncExitStack() as stack:
         # ── Redis Checkpointer（可选）────────────────────────────
@@ -120,24 +116,22 @@ async def lifespan(app: FastAPI):
                     AsyncRedisSaver.from_url(settings.redis_url)
                 )
                 await checkpointer.setup()
-                logger.info("✅ Redis Checkpointer 已启用（断点续传支持）")
+                logger.info("Redis Checkpointer 已启用（断点续传支持）")
             except Exception as e:
-                logger.warning(f"⚠️  Redis 不可用，以无持久化模式运行: {e}")
+                logger.warning(f"Redis 不可用，以无持久化模式运行: {e}")
                 checkpointer = None
 
         # 编译 LangGraph 图
         _graph = build_graph(checkpointer)
-        logger.info(
-            f"✅ LangGraph 图已编译（checkpointer={'Redis' if checkpointer else '无'}）"
-        )
+        logger.info(f"LangGraph 图已编译（checkpointer={'Redis' if checkpointer else '无'}）")
 
         # ── PostgreSQL（可选）────────────────────────────────────
         if settings.database_url:
             try:
                 await db.init_db(settings.database_url)
-                logger.info("✅ PostgreSQL 连接池已就绪（历史报告持久化）")
+                logger.info("PostgreSQL 连接池已就绪（历史报告持久化）")
             except Exception as e:
-                logger.warning(f"⚠️  PostgreSQL 不可用，使用内存缓存: {e}")
+                logger.warning(f"PostgreSQL 不可用，使用内存缓存: {e}")
 
         # ── LangSmith 追踪（可选）───────────────────────────────
         if settings.langchain_tracing_v2.lower() == "true" and settings.langchain_api_key:
@@ -145,20 +139,12 @@ async def lifespan(app: FastAPI):
             os.environ["LANGCHAIN_API_KEY"]    = settings.langchain_api_key
             os.environ["LANGCHAIN_PROJECT"]    = settings.langchain_project
             os.environ["LANGCHAIN_ENDPOINT"]   = settings.langchain_endpoint
-            logger.info(f"✅ LangSmith tracing 已启用：project={settings.langchain_project}")
-
-        # ── ChromaDB 检索器────────────────────────────────────
-        try:
-            retriever = get_retriever()
-            set_retriever(retriever)
-            logger.info("✅ ChromaDB 检索器初始化完成")
-        except Exception as e:
-            logger.warning(f"ChromaDB 初始化警告：{e} — RAG 功能已禁用")
+            logger.info(f"LangSmith tracing 已启用：project={settings.langchain_project}")
 
         yield
 
     await db.close_db()
-    logger.info("👋 服务已关闭")
+    logger.info("服务已关闭")
 
 
 app = FastAPI(
@@ -178,7 +164,6 @@ app.add_middleware(
 
 class AnalysisRequest(BaseModel):
     company_name: str
-    include_rag: bool = True
     horizon: str = "medium"
 
     @field_validator("horizon")
@@ -195,10 +180,9 @@ class AnalysisRequest(BaseModel):
 async def health():
     return {
         "status": "正常",
-        "model": settings.openai_model,
-        "vector_db": "ChromaDB（本地）",
+        "model":        settings.openai_model,
         "checkpointer": "Redis" if settings.redis_url else "无",
-        "persistence": "PostgreSQL" if db._pool else "内存",
+        "persistence":  "PostgreSQL" if db._pool else "内存",
     }
 
 
@@ -208,18 +192,6 @@ async def resolve(name: str = Query(...)):
     return {"input": name, "ticker": ticker}
 
 
-# ── SEC 文件索引 ──────────────────────────────────────────────
-
-@app.post("/api/index/{name_or_ticker}")
-async def index_company(name_or_ticker: str):
-    ticker = company_name_to_ticker(name_or_ticker)
-    try:
-        result = await index_ticker(ticker)
-        return {"input": name_or_ticker, "ticker": ticker, **result}
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-
 # ── 流式分析 SSE ──────────────────────────────────────────────
 
 @app.post("/api/analyze/stream")
@@ -227,11 +199,10 @@ async def analyze_stream(req: AnalysisRequest):
     """SSE 流式分析，实时推送 Agent 推理过程"""
     graph   = _get_graph()
     ticker  = company_name_to_ticker(req.company_name)
-    initial = _make_initial_state(ticker, req.include_rag, req.horizon)
+    initial = _make_initial_state(ticker, req.horizon)
 
     async def gen():
         thread_id = str(uuid.uuid4())
-        # 推送 session_start，让前端可以保存 thread_id 用于可能的重连
         yield (
             f"data: {json.dumps({'event_type':'session_start','thread_id':thread_id,'ticker':ticker}, ensure_ascii=False)}\n\n"
         )
@@ -276,9 +247,9 @@ async def analyze_stream(req: AnalysisRequest):
 @app.post("/api/analyze")
 async def analyze(req: AnalysisRequest):
     """非流式分析（测试/批量处理用）"""
-    graph   = _get_graph()
-    ticker  = company_name_to_ticker(req.company_name)
-    initial = _make_initial_state(ticker, req.include_rag, req.horizon)
+    graph     = _get_graph()
+    ticker    = company_name_to_ticker(req.company_name)
+    initial   = _make_initial_state(ticker, req.horizon)
     thread_id = str(uuid.uuid4())
     try:
         final = await graph.ainvoke(initial, config=_make_config(thread_id))
@@ -310,7 +281,7 @@ async def analyze_download(req: AnalysisRequest):
     rec = await _get_latest_report(ticker)
 
     if rec is None:
-        initial   = _make_initial_state(ticker, req.include_rag, req.horizon)
+        initial   = _make_initial_state(ticker, req.horizon)
         thread_id = str(uuid.uuid4())
         try:
             final = await graph.ainvoke(initial, config=_make_config(thread_id))
