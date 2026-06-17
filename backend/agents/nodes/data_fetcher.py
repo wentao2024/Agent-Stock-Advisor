@@ -61,7 +61,10 @@ async def data_fetcher_node(state: StockAnalysisState) -> dict:
     key_metrics          = _safe_dict(raw_metrics,    "get_key_metrics")
     price_data           = _safe_dict(raw_price,      "get_stock_price_history")
     financial_statements = _safe_dict(raw_financials, "get_financial_statements")
-    recent_news          = _safe_list(raw_news,       "get_recent_news")
+    recent_news          = [
+        n for n in _safe_list(raw_news, "get_recent_news")
+        if n.get("title") and n.get("published", "").startswith("197") is False
+    ]
 
     # ── 并发完成后汇报 ──────────────────────────────────────────
     if key_metrics:
