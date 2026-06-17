@@ -46,7 +46,6 @@ async def synthesizer_node(state: StockAnalysisState) -> dict:
     metrics    = state.get("key_metrics") or {}
     price_data = state.get("price_data") or {}
     news       = state.get("recent_news") or []
-    rag        = state.get("rag_contexts") or []
     tech       = state.get("technical_analysis") or {}
     peers      = state.get("peer_comparison") or {}
     horizon    = state.get("horizon", "medium")
@@ -185,12 +184,6 @@ investment_horizon 设置为：{horizon}
                 source_type="yfinance",
                 name=f"同行业对比（{peers.get('sector','')}）",
                 relevance="PE、营收增长、净利率行业对标",
-            ))
-        if rag:
-            sources.append(DataSource(
-                source_type="chromadb_rag",
-                name=f"{ticker} SEC 文件（ChromaDB）",
-                relevance="风险因素、业务描述、管理层讨论",
             ))
         if news:
             sources.append(DataSource(source_type="news", name="最新新闻", relevance="近期动态、情绪信号"))
