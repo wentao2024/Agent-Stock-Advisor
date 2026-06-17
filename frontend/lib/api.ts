@@ -88,19 +88,30 @@ export async function* analyzeStream(
 
 export async function downloadReport(companyName: string): Promise<void> {
   const res = await fetch(`${API}/api/analyze/download`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ company_name: companyName, include_rag: true }),
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ company_name: companyName }),
   });
   if (!res.ok) throw new Error("Download failed");
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
+  a.style.display = "none";
+
   const disp = res.headers.get("Content-Disposition") || "";
-  const match = disp.match(/filename="([^"]+)"/);
-  a.download = match ? match[1] : `analysis_${companyName}.txt`;
+  const rfc5987 = disp.match(/filename\*=UTF-8''([^;\s]+)/i);
+  const legacy  = disp.match(/filename="([^"]+)"/);
+  a.download = rfc5987
+    ? decodeURIComponent(rfc5987[1])
+    : legacy
+      ? legacy[1]
+      : `analysis_${companyName}.txt`;
+
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 200);
 }
 
 export async function resolveCompany(name: string) {

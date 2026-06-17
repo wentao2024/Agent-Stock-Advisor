@@ -160,7 +160,7 @@ Fetches historical analysis records for a ticker (PostgreSQL mode only).
 
 ```json
 {
-  "status": "正常",
+  "status": "200",
   "model": "gpt-4o",
   "checkpointer": "Redis",
   "persistence": "PostgreSQL"

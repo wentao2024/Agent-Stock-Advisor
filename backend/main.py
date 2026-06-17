@@ -159,6 +159,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 
@@ -298,11 +299,17 @@ async def analyze_download(req: AnalysisRequest):
             raise HTTPException(500, str(e))
 
     txt      = _format_txt(rec, req.company_name, ticker)
-    filename = f"{ticker}_分析报告_{date.today().isoformat()}.txt"
+    filename = f"{ticker}_analysis_{date.today().isoformat()}.txt"
+    from urllib.parse import quote as _url_quote
+    filename_cn = f"{ticker}_分析报告_{date.today().isoformat()}.txt"
+    filename_encoded = _url_quote(filename_cn, safe="")
     return PlainTextResponse(
         content=txt,
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": (
+                f'attachment; filename="{filename}"; '
+                f"filename*=UTF-8''{filename_encoded}"
+            ),
             "Content-Type": "text/plain; charset=utf-8",
         },
     )
