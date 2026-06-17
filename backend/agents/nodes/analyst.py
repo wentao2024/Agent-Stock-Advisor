@@ -53,7 +53,6 @@ async def analyst_node(state: StockAnalysisState) -> dict:
     price_data         = state.get("price_data") or {}
     financials         = state.get("financial_statements") or {}
     news               = state.get("recent_news") or []
-    rag                = state.get("rag_contexts") or []
     tech               = state.get("technical_analysis") or {}
     peers              = state.get("peer_comparison") or {}
     horizon            = state.get("horizon", "medium")
@@ -163,7 +162,6 @@ PB：{metrics.get('pb_ratio','N/A')} | EV/EBITDA：{metrics.get('ev_ebitda','N/A
     news_text = "\n".join(
         f"- [{n.get('published','')}] {n.get('title','')}" for n in news[:6]
     )
-    rag_text = "\n---\n".join(rag[:2]) if rag else "暂无额外文件内容"
 
     s5, u5 = await _llm_async(ANALYST_SYS, f"""对 {ticker} 进行跨数据源风险综合：
 前四步摘要：
@@ -173,10 +171,7 @@ PB：{metrics.get('pb_ratio','N/A')} | EV/EBITDA：{metrics.get('ev_ebitda','N/A
 技术信号：{tech.get('overall_signal','N/A')} — {tech.get('rsi_signal','N/A')}，{tech.get('macd_trend','N/A')}
 
 最新新闻：
-{news_text[:400]}
-
-SEC/RAG 内容：
-{rag_text[:400]}
+{news_text[:600]}
 
 请识别3~5个关键风险，每个风险需注明数据依据，重点关注跨数据源的信号叠加。""")
 
@@ -197,17 +192,16 @@ SEC/RAG 内容：
         "data": {"input_tokens": _in, "output_tokens": _out, "total_tokens": _in + _out},
     })
 
-    # 置信度计算
+    # 置信度计算（总权重 4.0）
     data_quality = sum([
         1.0 if metrics    else 0.0,
         1.0 if price_data else 0.0,
         0.8 if financials else 0.0,
         0.5 if news       else 0.0,
-        0.5 if rag        else 0.0,
         0.4 if tech.get("rsi_14") is not None else 0.0,
         0.3 if peers.get("peers") else 0.0,
     ])
-    confidence = min(0.95, max(0.45, data_quality / 4.5))
+    confidence = min(0.95, max(0.45, data_quality / 4.0))
 
     return {
         "revenue_analysis":       s1,
