@@ -1,5 +1,5 @@
 """
-Financial Analyst 节点：5步多跳推理（异步并行版）
+Financial Analyst 节点：5步多跳推理（异步并行）
 
 Step 1/2/3 并行执行，Step 4 汇总 1+2+3，Step 5 跨数据源风险综合
 同时整合技术分析信号和同行业对比数据
