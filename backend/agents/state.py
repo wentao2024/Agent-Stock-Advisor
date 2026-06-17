@@ -10,7 +10,6 @@ class StockAnalysisState(TypedDict, total=False):
     # 输入
     ticker: str
     company_name: str
-    include_rag: bool
     horizon: str
 
     # 消息（直接调用方式下保持空列表）
@@ -21,7 +20,6 @@ class StockAnalysisState(TypedDict, total=False):
     financial_statements: dict
     key_metrics: dict
     recent_news: list
-    rag_contexts: list
 
     # 技术分析（technical_analyst 节点输出）
     technical_analysis: dict
