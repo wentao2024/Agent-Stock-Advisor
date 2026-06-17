@@ -12,7 +12,7 @@ LangGraph 图
 
 节点职责：
 - planner：解析 ticker，获取公司名称
-- data_fetcher：并行拉取市场数据、财务三表、新闻、RAG（asyncio.gather）
+- data_fetcher：并行拉取市场数据、财务三表、新闻（asyncio.gather）
 - technical_analyst：RSI / MACD / 布林带 / 均线（纯量化，无 LLM）
 - peer_benchmarker：同行业估值对比
 - analyst：5步多跳推理（Step1/2/3 并行），支持反思建议注入
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 def planner_node(state: StockAnalysisState) -> dict:
     """解析公司名称/ticker，获取标准化公司名，添加开始事件。"""
-    from rag.indexer import company_name_to_ticker
+    from ticker_resolver import company_name_to_ticker
 
     raw    = state.get("ticker") or state.get("company_name") or "AAPL"
     ticker = company_name_to_ticker(raw)
