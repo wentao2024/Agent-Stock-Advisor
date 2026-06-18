@@ -130,16 +130,37 @@ def get_recent_news(ticker: str, max_items: int = 10) -> list[dict]:
     """获取公司最新新闻，用于情绪分析和风险识别"""
     try:
         news_raw = yf.Ticker(ticker).news or []
-        from datetime import datetime
-        return [
-            {
-                "title": item.get("title", ""),
-                "publisher": item.get("publisher", ""),
-                "published": datetime.fromtimestamp(item.get("providerPublishTime", 0)).strftime("%Y-%m-%d"),
-                "summary": item.get("summary", ""),
-            }
-            for item in news_raw[:max_items]
-        ]
+        from datetime import datetime, timezone
+
+        results = []
+        for item in news_raw[:max_items]:
+            # yfinance 新版 API：数据嵌套在 content 字段内
+            c = item.get("content") or item
+
+            title     = c.get("title", "")
+            summary   = c.get("summary") or c.get("description", "")
+            publisher = (c.get("provider") or {}).get("displayName", "") or c.get("publisher", "")
+
+            # 时间：新版用 ISO 字符串 pubDate，旧版用 providerPublishTime 时间戳
+            pub_date = ""
+            if c.get("pubDate"):
+                pub_date = c["pubDate"][:10]
+            elif c.get("providerPublishTime"):
+                pub_date = datetime.fromtimestamp(
+                    c["providerPublishTime"], tz=timezone.utc
+                ).strftime("%Y-%m-%d")
+
+            if not title:
+                continue
+
+            results.append({
+                "title": title,
+                "publisher": publisher,
+                "published": pub_date,
+                "summary": summary,
+            })
+
+        return results
     except Exception as e:
         return [{"error": str(e)}]
 
