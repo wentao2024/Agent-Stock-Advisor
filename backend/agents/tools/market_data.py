@@ -134,14 +134,12 @@ def get_recent_news(ticker: str, max_items: int = 10) -> list[dict]:
 
         results = []
         for item in news_raw[:max_items]:
-            # yfinance 新版 API：数据嵌套在 content 字段内
             c = item.get("content") or item
 
             title     = c.get("title", "")
             summary   = c.get("summary") or c.get("description", "")
             publisher = (c.get("provider") or {}).get("displayName", "") or c.get("publisher", "")
 
-            # 时间：新版用 ISO 字符串 pubDate，旧版用 providerPublishTime 时间戳
             pub_date = ""
             if c.get("pubDate"):
                 pub_date = c["pubDate"][:10]
