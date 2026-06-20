@@ -1,6 +1,6 @@
 """
-Synthesizer 节点：with_structured_output → StockRecommendation（中文输出）
-整合基本面分析 + 技术指标 + 同行对比，生成完整结构化报告
+Synthesizer node: with_structured_output → StockRecommendation
+Integrates fundamental analysis + technical indicators + peer comparison into a complete structured report.
 """
 import logging
 from datetime import date
@@ -25,18 +25,18 @@ def _get_llm() -> ChatOpenAI:
     return _llm
 
 
-SYS = """你是投资银行首席股票分析师。请基于以下分析生成完整的结构化投资报告。
+SYS = """You are a chief equity analyst at an investment bank. Generate a complete structured investment report based on the analysis below.
 
-要求：
-- recommendation：STRONG_BUY / BUY / HOLD / SELL / STRONG_SELL
-- confidence：0~1 浮点数，反映分析确定性
-- one_line_thesis：核心投资论点（中文，30字以内）
-- bull_case / bear_case：各3~5条，每条需有数据支撑
-- key_risks：3~5个主要风险
-- catalysts：近期催化剂
-- reasoning_chain：5步推理链，对应分析过程
-- 目标价基于 PE/DCF 合理推算，并参考分析师共识
-- 所有文字内容请用中文
+Requirements:
+- recommendation: STRONG_BUY / BUY / HOLD / SELL / STRONG_SELL
+- confidence: float 0–1, reflecting analytical certainty
+- one_line_thesis: core investment thesis (English, under 30 words)
+- bull_case / bear_case: 3–5 items each, each backed by data
+- key_risks: 3–5 major risks
+- catalysts: near-term catalysts
+- reasoning_chain: 5-step reasoning chain corresponding to the analysis process
+- Target price derived from P/E/DCF reasoning and analyst consensus
+- All text content must be in English
 """
 
 
@@ -54,64 +54,64 @@ async def synthesizer_node(state: StockAnalysisState) -> dict:
     events.append({
         "event_type": "agent_start",
         "node": "synthesizer",
-        "message": "正在生成结构化投资建议报告...",
+        "message": "Generating structured investment recommendation report...",
         "data": {},
     })
 
-    # include_raw=True 让我们能获取原始 AIMessage 以读取 usage_metadata
+    # include_raw=True allows reading usage_metadata from the raw AIMessage
     structured_llm = _get_llm().with_structured_output(StockRecommendation, include_raw=True)
 
     current_price = price_data.get("current_price", 0.0) or 0.0
 
-    # 技术分析摘要
+    # Technical analysis summary
     tech_section = ""
     if tech.get("rsi_14") is not None:
         tech_section = f"""
-【技术分析信号】
-综合信号：{tech.get('overall_signal','N/A')}
+[Technical Analysis Signals]
+Overall Signal: {tech.get('overall_signal','N/A')}
 {tech.get('signal_summary', '')}
-布林带挤压：{'是（波动率收窄，注意突破方向）' if tech.get('bb_squeeze') else '否'}
-股价偏离MA20：{tech.get('price_vs_ma20_pct', 'N/A')}%
+Bollinger Band Squeeze: {'Yes (volatility contracting, watch breakout direction)' if tech.get('bb_squeeze') else 'No'}
+Price vs MA20: {tech.get('price_vs_ma20_pct', 'N/A')}%
 """
 
-    # 同行对比摘要
+    # Peer comparison summary
     peer_section = ""
     if peers.get("peers"):
         peer_section = f"""
-【同行业对比（{peers.get('sector','')} / {peers.get('industry','')}）】
+[Peer Comparison ({peers.get('sector','')} / {peers.get('industry','')})]
 {peers.get('summary', '')}
-同行均值PE：{peers.get('peer_avg_pe','N/A')} | 均值营收增长：{peers.get('peer_avg_revenue_growth','N/A')} | 均值净利率：{peers.get('peer_avg_net_margin','N/A')}
+Peer Avg P/E: {peers.get('peer_avg_pe','N/A')} | Avg Revenue Growth: {peers.get('peer_avg_revenue_growth','N/A')} | Avg Net Margin: {peers.get('peer_avg_net_margin','N/A')}
 """
 
-    horizon_label = {"short": "短线（<3个月）", "long": "长线（>1年）"}.get(horizon, "中线（3~12个月）")
+    horizon_label = {"short": "Short-term (<3 months)", "long": "Long-term (>1 year)"}.get(horizon, "Medium-term (3–12 months)")
 
     prompt = f"""
-公司：{company}（{ticker}）| 分析日期：{date.today().isoformat()} | 当前价：${current_price} | 投资期限：{horizon_label}
+Company: {company} ({ticker}) | Analysis Date: {date.today().isoformat()} | Current Price: ${current_price} | Investment Horizon: {horizon_label}
 
-【营收分析】{state.get('revenue_analysis') or '数据不足'}
+[Revenue Analysis] {state.get('revenue_analysis') or 'Insufficient data'}
 
-【利润率分析】{state.get('margin_analysis') or '数据不足'}
+[Margin Analysis] {state.get('margin_analysis') or 'Insufficient data'}
 
-【资产负债分析】{state.get('balance_sheet_analysis') or '数据不足'}
+[Balance Sheet Analysis] {state.get('balance_sheet_analysis') or 'Insufficient data'}
 
-【估值分析】{state.get('valuation_analysis') or '数据不足'}
+[Valuation Analysis] {state.get('valuation_analysis') or 'Insufficient data'}
 
-【风险综合】{state.get('risk_synthesis') or '数据不足'}
+[Risk Synthesis] {state.get('risk_synthesis') or 'Insufficient data'}
 
-【关键财务指标】
-PE（TTM）：{metrics.get('pe_ratio','N/A')} | 远期PE：{metrics.get('forward_pe','N/A')} | PB：{metrics.get('pb_ratio','N/A')}
-营收增长：{metrics.get('revenue_growth','N/A')} | 净利率：{metrics.get('net_margin','N/A')}
-负债率：{metrics.get('debt_to_equity','N/A')} | 自由现金流：${metrics.get('free_cash_flow','N/A')}
-分析师目标价：${metrics.get('analyst_target_price','N/A')}
+[Key Financial Metrics]
+P/E (TTM): {metrics.get('pe_ratio','N/A')} | Forward P/E: {metrics.get('forward_pe','N/A')} | P/B: {metrics.get('pb_ratio','N/A')}
+Revenue Growth: {metrics.get('revenue_growth','N/A')} | Net Margin: {metrics.get('net_margin','N/A')}
+Debt/Equity: {metrics.get('debt_to_equity','N/A')} | Free Cash Flow: ${metrics.get('free_cash_flow','N/A')}
+Analyst Target Price: ${metrics.get('analyst_target_price','N/A')}
 {tech_section}
 {peer_section}
-【置信度】{state.get('confidence_score', 0.6):.0%}
+[Confidence Score] {state.get('confidence_score', 0.6):.0%}
 
-【最新新闻】
+[Latest News]
 {chr(10).join(f'- {n.get("title","")}' for n in news[:4])}
 
-请生成完整的结构化投资建议报告，所有文字内容使用中文。
-investment_horizon 设置为：{horizon}
+Generate a complete structured investment recommendation report. All text content must be in English.
+Set investment_horizon to: {horizon}
 """
 
     try:
@@ -121,9 +121,9 @@ investment_horizon 设置为：{horizon}
         ])
         rec: StockRecommendation = raw_result["parsed"]
         if rec is None:
-            raise ValueError(f"结构化输出解析失败: {raw_result.get('parsing_error')}")
+            raise ValueError(f"Structured output parsing failed: {raw_result.get('parsing_error')}")
 
-        # 提取 token 用量
+        # Extract token usage
         raw_msg = raw_result.get("raw")
         usage   = (raw_msg.usage_metadata or {}) if raw_msg else {}
         _in  = usage.get("input_tokens",  0)
@@ -131,11 +131,11 @@ investment_horizon 设置为：{horizon}
         events.append({
             "event_type": "token_usage",
             "node": "synthesizer",
-            "message": f"Tokens — 输入 {_in:,} / 输出 {_out:,} / 合计 {_in + _out:,}",
+            "message": f"Tokens — input {_in:,} / output {_out:,} / total {_in + _out:,}",
             "data": {"input_tokens": _in, "output_tokens": _out, "total_tokens": _in + _out},
         })
 
-        # 用实际数据覆盖 LLM 生成的数字，确保准确性
+        # Override LLM-generated numbers with actual data for accuracy
         rec.ticker            = ticker
         rec.company_name      = company
         rec.analysis_date     = date.today().isoformat()
@@ -171,22 +171,22 @@ investment_horizon 设置为：{horizon}
         )
 
         sources = [
-            DataSource(source_type="yfinance", name=f"{ticker} 市场数据", relevance="股价、财务指标、新闻")
+            DataSource(source_type="yfinance", name=f"{ticker} Market Data", relevance="Price, financial metrics, news")
         ]
         if tech.get("rsi_14") is not None:
             sources.append(DataSource(
                 source_type="yfinance",
-                name=f"{ticker} 技术指标",
-                relevance="RSI、MACD、布林带、均线系统",
+                name=f"{ticker} Technical Indicators",
+                relevance="RSI, MACD, Bollinger Bands, moving averages",
             ))
         if peers.get("peers"):
             sources.append(DataSource(
                 source_type="yfinance",
-                name=f"同行业对比（{peers.get('sector','')}）",
-                relevance="PE、营收增长、净利率行业对标",
+                name=f"Peer Comparison ({peers.get('sector','')})",
+                relevance="P/E, revenue growth, net margin benchmarking",
             ))
         if news:
-            sources.append(DataSource(source_type="news", name="最新新闻", relevance="近期动态、情绪信号"))
+            sources.append(DataSource(source_type="news", name="Latest News", relevance="Recent developments, sentiment signals"))
         rec.sources = sources
 
         rec_dict = rec.model_dump()
@@ -194,7 +194,7 @@ investment_horizon 设置为：{horizon}
         events.append({
             "event_type": "recommendation",
             "node": "synthesizer",
-            "message": f"分析完成：{rec.recommendation}（置信度 {rec.confidence:.0%}）",
+            "message": f"Analysis complete: {rec.recommendation} (confidence {rec.confidence:.0%})",
             "data": {
                 "recommendation": rec.recommendation,
                 "confidence":     rec.confidence,
@@ -204,7 +204,7 @@ investment_horizon 设置为：{horizon}
         events.append({
             "event_type": "done",
             "node": "synthesizer",
-            "message": "报告生成完毕",
+            "message": "Report generated",
             "data": {},
         })
 
