@@ -1,8 +1,8 @@
 """
-Technical Analyst 节点 — 纯量化技术指标计算
+Technical Analyst node — pure quantitative indicator calculation
 
-从已获取的 OHLCV 数据计算：RSI、MACD、布林带、均线系统
-无 LLM 调用，结果完全客观可重复
+Computes from pre-fetched OHLCV data: RSI, MACD, Bollinger Bands, moving average system.
+No LLM calls; results are fully objective and reproducible.
 """
 import logging
 import math
@@ -75,7 +75,7 @@ def technical_analyst_node(state: StockAnalysisState) -> dict:
     events.append({
         "event_type": "agent_start",
         "node": "technical_analyst",
-        "message": "计算技术指标：RSI / MACD / 布林带 / 均线系统",
+        "message": "Computing technical indicators: RSI / MACD / Bollinger Bands / Moving Averages",
         "data": {"ticker": ticker},
     })
 
@@ -84,22 +84,22 @@ def technical_analyst_node(state: StockAnalysisState) -> dict:
     current_price  = price_data.get("current_price") or 0.0
 
     result: dict = {
-        "rsi_14": None, "rsi_signal": "数据不足",
+        "rsi_14": None, "rsi_signal": "Insufficient data",
         "macd_line": None, "macd_signal_line": None, "macd_histogram": None,
-        "macd_trend": "数据不足",
+        "macd_trend": "Insufficient data",
         "bb_upper": None, "bb_middle": None, "bb_lower": None,
-        "bb_position": "数据不足", "bb_squeeze": False,
+        "bb_position": "Insufficient data", "bb_squeeze": False,
         "ma20": None, "ma50": None, "ma200": None,
-        "price_vs_ma20_pct": None, "ma_signal": "数据不足",
-        "volume_trend": "数据不足",
+        "price_vs_ma20_pct": None, "ma_signal": "Insufficient data",
+        "volume_trend": "Insufficient data",
         "overall_signal": "NEUTRAL",
-        "signal_summary": "数据不足，无法计算技术指标",
+        "signal_summary": "Insufficient data, cannot compute technical indicators",
     }
 
     if len(closes_1y) < 15:
         events.append({
             "event_type": "tool_result", "node": "technical_analyst",
-            "message": "价格数据不足，跳过技术分析", "data": {},
+            "message": "Insufficient price data, skipping technical analysis", "data": {},
         })
         return {"technical_analysis": result, "events": events}
 
@@ -108,39 +108,39 @@ def technical_analyst_node(state: StockAnalysisState) -> dict:
     result["rsi_14"] = rsi
     if rsi is not None:
         if rsi > 70:
-            result["rsi_signal"] = f"超买({rsi:.1f})"
+            result["rsi_signal"] = f"Overbought ({rsi:.1f})"
         elif rsi < 30:
-            result["rsi_signal"] = f"超卖({rsi:.1f})"
+            result["rsi_signal"] = f"Oversold ({rsi:.1f})"
         else:
-            result["rsi_signal"] = f"中性({rsi:.1f})"
+            result["rsi_signal"] = f"Neutral ({rsi:.1f})"
 
     # ── MACD(12,26,9) ────────────────────────────────────────────
     macd_line, macd_sig, macd_hist = _macd(closes_1y)
     result["macd_line"], result["macd_signal_line"], result["macd_histogram"] = macd_line, macd_sig, macd_hist
     if macd_hist is not None and macd_line is not None and macd_sig is not None:
         if macd_line > macd_sig and macd_hist > 0:
-            result["macd_trend"] = "看多（MACD在信号线上方）"
+            result["macd_trend"] = "Bullish (MACD above signal line)"
         elif macd_line < macd_sig and macd_hist < 0:
-            result["macd_trend"] = "看空（MACD在信号线下方）"
+            result["macd_trend"] = "Bearish (MACD below signal line)"
         else:
-            result["macd_trend"] = "震荡（MACD交叉区域）"
+            result["macd_trend"] = "Neutral (MACD crossover zone)"
 
-    # ── 布林带(20,2) ──────────────────────────────────────────────
+    # ── Bollinger Bands (20,2) ────────────────────────────────────
     bb_upper, bb_mid, bb_lower = _bollinger(closes_1y)
     result["bb_upper"], result["bb_middle"], result["bb_lower"] = bb_upper, bb_mid, bb_lower
     if bb_upper and bb_lower and bb_mid and current_price:
         bb_width_pct = (bb_upper - bb_lower) / bb_mid
         result["bb_squeeze"] = bb_width_pct < 0.04
         if current_price > bb_upper:
-            result["bb_position"] = "突破上轨（强势）"
+            result["bb_position"] = "Above upper band (strong)"
         elif current_price < bb_lower:
-            result["bb_position"] = "跌破下轨（弱势）"
+            result["bb_position"] = "Below lower band (weak)"
         elif current_price > bb_mid:
-            result["bb_position"] = "上轨与中轨之间（偏强）"
+            result["bb_position"] = "Between mid and upper band (slightly bullish)"
         else:
-            result["bb_position"] = "下轨与中轨之间（偏弱）"
+            result["bb_position"] = "Between lower and mid band (slightly bearish)"
 
-    # ── 均线系统 ──────────────────────────────────────────────────
+    # ── Moving Average System ─────────────────────────────────────
     ma20 = _sma(closes_1y, 20)
     ma50 = _sma(closes_1y, 50)
     ma200 = _sma(closes_1y, 200)
@@ -149,13 +149,13 @@ def technical_analyst_node(state: StockAnalysisState) -> dict:
         result["price_vs_ma20_pct"] = round((current_price - ma20) / ma20 * 100, 2)
     if ma20 and ma50:
         if ma20 > ma50:
-            result["ma_signal"] = f"金叉（MA20={ma20:.2f} > MA50={ma50:.2f}）"
+            result["ma_signal"] = f"Golden cross (MA20={ma20:.2f} > MA50={ma50:.2f})"
         else:
-            result["ma_signal"] = f"死叉（MA20={ma20:.2f} < MA50={ma50:.2f}）"
+            result["ma_signal"] = f"Death cross (MA20={ma20:.2f} < MA50={ma50:.2f})"
     elif ma20:
-        result["ma_signal"] = f"MA20={ma20:.2f}（MA50数据不足）"
+        result["ma_signal"] = f"MA20={ma20:.2f} (MA50 data unavailable)"
 
-    # ── 成交量趋势 ──────────────────────────────────────────────
+    # ── Volume Trend ──────────────────────────────────────────────
     if len(ohlcv) >= 10:
         recent_vols = [d.get("volume", 0) for d in ohlcv[-5:]]
         prev_vols   = [d.get("volume", 0) for d in ohlcv[-30:-5]]
@@ -164,13 +164,13 @@ def technical_analyst_node(state: StockAnalysisState) -> dict:
         if avg_prev > 0:
             ratio = avg_recent / avg_prev
             if ratio > 1.3:
-                result["volume_trend"] = f"放量（近5日均量是前期{ratio:.1f}倍）"
+                result["volume_trend"] = f"Expanding volume (5-day avg is {ratio:.1f}x prior period)"
             elif ratio < 0.7:
-                result["volume_trend"] = f"缩量（近5日均量是前期{ratio:.1f}倍）"
+                result["volume_trend"] = f"Contracting volume (5-day avg is {ratio:.1f}x prior period)"
             else:
-                result["volume_trend"] = f"量能平稳（{ratio:.1f}倍）"
+                result["volume_trend"] = f"Stable volume ({ratio:.1f}x)"
 
-    # ── 综合多空计分 ──────────────────────────────────────────────
+    # ── Bull/Bear score ───────────────────────────────────────────
     bull = 0
     bear = 0
     if rsi is not None:
@@ -195,18 +195,18 @@ def technical_analyst_node(state: StockAnalysisState) -> dict:
     result["signal_summary"] = (
         f"RSI: {result['rsi_signal']} | "
         f"MACD: {result['macd_trend']} | "
-        f"布林带: {result['bb_position']} | "
-        f"均线: {result['ma_signal']} | "
-        f"成交量: {result['volume_trend']}"
+        f"Bollinger: {result['bb_position']} | "
+        f"MA: {result['ma_signal']} | "
+        f"Volume: {result['volume_trend']}"
     )
 
     signal_emoji = {"BULLISH": "📈", "BEARISH": "📉", "NEUTRAL": "➡️"}.get(result["overall_signal"], "")
     events.append({
         "event_type": "reasoning_step",
         "node": "technical_analyst",
-        "message": f"{signal_emoji} 技术综合信号：{result['overall_signal']}",
+        "message": f"{signal_emoji} Technical composite signal: {result['overall_signal']}",
         "data": {
-            "step": 0, "title": "技术分析",
+            "step": 0, "title": "Technical Analysis",
             "finding": result["signal_summary"],
         },
     })
