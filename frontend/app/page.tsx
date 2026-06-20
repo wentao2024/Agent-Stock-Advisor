@@ -99,11 +99,11 @@ const DEMOS = ["Apple", "Microsoft", "NVIDIA", "Tesla", "Meta", "Amazon", "Googl
 type RecType = "STRONG_BUY" | "BUY" | "HOLD" | "SELL" | "STRONG_SELL";
 
 const REC: Record<RecType, { color: string; bg: string; border: string; label: string; grad: string }> = {
-  STRONG_BUY:  { color: "#10b981", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.25)", label: "Strong Buy",  grad: "linear-gradient(135deg,#10b981,#059669)" },
-  BUY:         { color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)",  label: "Buy",         grad: "linear-gradient(135deg,#34d399,#10b981)" },
-  HOLD:        { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)", label: "Hold",        grad: "linear-gradient(135deg,#f59e0b,#d97706)" },
-  SELL:        { color: "#f87171", bg: "rgba(248,113,113,0.08)",border: "rgba(248,113,113,0.2)", label: "Sell",        grad: "linear-gradient(135deg,#f87171,#ef4444)" },
-  STRONG_SELL: { color: "#ef4444", bg: "rgba(239,68,68,0.08)",  border: "rgba(239,68,68,0.25)", label: "Strong Sell", grad: "linear-gradient(135deg,#ef4444,#dc2626)" },
+  STRONG_BUY:  { color: "#059669", bg: "#f0fdf4", border: "#6ee7b7", label: "Strong Buy",  grad: "linear-gradient(90deg,#059669,#10b981)" },
+  BUY:         { color: "#10b981", bg: "#f0fdf4", border: "#a7f3d0", label: "Buy",         grad: "linear-gradient(90deg,#10b981,#34d399)" },
+  HOLD:        { color: "#d97706", bg: "#fffbeb", border: "#fcd34d", label: "Hold",        grad: "linear-gradient(90deg,#d97706,#f59e0b)" },
+  SELL:        { color: "#dc2626", bg: "#fef2f2", border: "#fca5a5", label: "Sell",        grad: "linear-gradient(90deg,#dc2626,#ef4444)" },
+  STRONG_SELL: { color: "#b91c1c", bg: "#fef2f2", border: "#f87171", label: "Strong Sell", grad: "linear-gradient(90deg,#b91c1c,#dc2626)" },
 };
 
 const NODE_ICON: Record<string, React.ReactNode> = {
@@ -229,7 +229,7 @@ export default function App() {
     { label: "Market Cap",      val: rec.metrics.market_cap_b ? `$${rec.metrics.market_cap_b.toFixed(1)}B` : "—" },
     { label: "P/E (TTM)",       val: num(rec.metrics.pe_ratio) },
     { label: "Forward P/E",     val: num(rec.metrics.forward_pe) },
-    { label: "Revenue Growth",  val: pct(rec.metrics.revenue_growth_yoy), color: isPos(rec.metrics.revenue_growth_yoy) ? "#10b981" : "#ef4444", sub: "YoY" },
+    { label: "Revenue Growth",  val: pct(rec.metrics.revenue_growth_yoy), color: isPos(rec.metrics.revenue_growth_yoy) ? "#059669" : "#dc2626", sub: "YoY" },
     { label: "Gross Margin",    val: pct(rec.metrics.gross_margin) },
     { label: "Net Margin",      val: pct(rec.metrics.net_margin) },
     { label: "ROE",             val: pct(rec.metrics.roe) },
@@ -382,7 +382,7 @@ export default function App() {
                     <div className="verdict-ticker" style={{ color: cfg.color }}>{rec.ticker}</div>
                     <div className="verdict-name">{rec.company_name}</div>
                   </div>
-                  <div className="verdict-badge" style={{ color: cfg.color, background: "rgba(0,0,0,0.2)", borderColor: cfg.border }}>
+                  <div className="verdict-badge" style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}>
                     {rec.recommendation === "STRONG_BUY" || rec.recommendation === "BUY"
                       ? <IconTrendUp />
                       : rec.recommendation === "STRONG_SELL" || rec.recommendation === "SELL"
@@ -420,7 +420,7 @@ export default function App() {
                   {rec.upside_pct != null && (
                     <div className="price-item">
                       <span className="price-label">Upside</span>
-                      <span className="price-value" style={{ color: rec.upside_pct >= 0 ? "#10b981" : "#ef4444" }}>
+                      <span className="price-value" style={{ color: rec.upside_pct >= 0 ? "#059669" : "#dc2626" }}>
                         {rec.upside_pct >= 0 ? "+" : ""}{rec.upside_pct.toFixed(1)}%
                       </span>
                     </div>
@@ -452,13 +452,13 @@ export default function App() {
                       {step.implication && (
                         <div className="chain-impl">
                           <IconArrow />
-                          <span style={{ color: "var(--text2)", fontSize: "12px" }}>{step.implication}</span>
+                          <span style={{ fontSize: "12px" }}>{step.implication}</span>
                         </div>
                       )}
                     </div>
                   ))}
                   {rec.sources?.length > 0 && (
-                    <div style={{ fontSize: "11px", color: "var(--text3)", paddingTop: "8px" }}>
+                    <div style={{ fontSize: "11px", color: "#9ca3af", paddingTop: "8px" }}>
                       Data Sources: {rec.sources.map(s => s.name).join(" · ")}
                     </div>
                   )}
