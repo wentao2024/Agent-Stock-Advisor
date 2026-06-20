@@ -1,4 +1,4 @@
-"""yfinance 市场数据工具（5个 @tool）"""
+"""yfinance market data tools (5 @tool functions)"""
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
@@ -20,7 +20,7 @@ def _sf(v) -> Optional[float]:
 
 @tool
 def get_stock_price_history(ticker: str, period: str = "1y") -> dict:
-    """获取股票历史价格、52周高低、近期涨跌幅。period: 1mo/3mo/6mo/1y/2y"""
+    """Fetch historical stock price, 52-week high/low, and recent performance. period: 1mo/3mo/6mo/1y/2y"""
     try:
         stock = yf.Ticker(ticker)
         hist = stock.history(period=period)
@@ -41,7 +41,7 @@ def get_stock_price_history(ticker: str, period: str = "1y") -> dict:
                 "low": _sf(row["Low"]), "close": _sf(row["Close"]),
                 "volume": int(row["Volume"]) if pd.notna(row["Volume"]) else 0,
             })
-        # 52w 高低优先使用 yfinance info（含日内高低），fallback 到历史收盘价
+        # Prefer yfinance info for 52w high/low (includes intraday), fallback to historical closes
         try:
             info = stock.info
             high_52w = _sf(info.get("fiftyTwoWeekHigh")) or _sf(hist["High"].max())
@@ -49,7 +49,7 @@ def get_stock_price_history(ticker: str, period: str = "1y") -> dict:
         except Exception:
             high_52w = _sf(hist["High"].max())
             low_52w  = _sf(hist["Low"].min())
-        # closes_1y 供技术分析节点使用
+        # closes_1y used by the technical analyst node
         closes_1y = [_sf(c) for c in hist["Close"].tolist()]
         return {
             "ticker": ticker, "current_price": current,
@@ -63,7 +63,7 @@ def get_stock_price_history(ticker: str, period: str = "1y") -> dict:
 
 @tool
 def get_financial_statements(ticker: str) -> dict:
-    """获取损益表、资产负债表、现金流量表（最近4期）"""
+    """Fetch income statement, balance sheet, and cash flow statement (last 4 periods)."""
     try:
         stock = yf.Ticker(ticker)
         def to_dict(df, n=4):
@@ -87,7 +87,7 @@ def get_financial_statements(ticker: str) -> dict:
 
 @tool
 def get_key_metrics(ticker: str) -> dict:
-    """获取核心财务指标：PE、PB、营收增长、利润率、市值、分析师目标价等"""
+    """Fetch key financial metrics: P/E, P/B, revenue growth, margins, market cap, analyst target price, etc."""
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
@@ -127,7 +127,7 @@ def get_key_metrics(ticker: str) -> dict:
 
 @tool
 def get_recent_news(ticker: str, max_items: int = 10) -> list[dict]:
-    """获取公司最新新闻，用于情绪分析和风险识别"""
+    """Fetch latest company news for sentiment analysis and risk identification."""
     try:
         news_raw = yf.Ticker(ticker).news or []
         from datetime import datetime, timezone
@@ -179,7 +179,7 @@ def _fetch_peer_info(peer: str) -> dict | None:
 
 @tool
 def get_peer_comparison(ticker: str) -> dict:
-    """获取同行业关键估值指标对比"""
+    """Fetch peer industry key valuation metric comparison."""
     PEERS = {
         "AAPL": ["MSFT", "GOOGL", "META"], "MSFT": ["AAPL", "GOOGL", "AMZN"],
         "GOOGL": ["MSFT", "META", "AMZN"], "NVDA": ["AMD", "INTC", "AVGO"],

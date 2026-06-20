@@ -3,20 +3,20 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # ── OpenAI（唯一 LLM 提供商）─────────────────────────────
+    # ── OpenAI (sole LLM provider) ────────────────────────────
     openai_api_key: str
     openai_model: str = "gpt-4o"
 
-    # ── LangSmith（可选，用于 Agent 执行轨迹可视化）──────────
+    # ── LangSmith (optional, for agent trace visualization) ───
     langchain_tracing_v2: str = "false"
     langchain_api_key: str = ""
     langchain_project: str = "stock-advisor"
     langchain_endpoint: str = "https://api.smith.langchain.com"
 
-    # ── Redis（LangGraph Checkpointer，可选）────────────────────
+    # ── Redis (LangGraph Checkpointer, optional) ──────────────
     redis_url: str = ""
 
-    # ── PostgreSQL（历史报告持久化，可选）──────────────────────
+    # ── PostgreSQL (historical report persistence, optional) ──
     database_url: str = ""
 
     # ── CORS ──────────────────────────────────────────────────

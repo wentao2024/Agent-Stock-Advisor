@@ -5,5 +5,5 @@ export const metadata: Metadata = {
   description: "LangGraph multi-agent stock analysis with multi-hop reasoning and ChromaDB RAG",
 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="zh"><body>{children}</body></html>;
+  return <html lang="en"><body>{children}</body></html>;
 }

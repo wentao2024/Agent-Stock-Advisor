@@ -1,23 +1,23 @@
 """
-LangGraph 图
+LangGraph graph
 
-正常路径：
+Normal path:
   START → planner → data_fetcher → technical_analyst → peer_benchmarker → analyst → synthesizer
 
-置信度 >= 0.65 或已反思 2 次：
+Confidence >= 0.65 or already reflected 2 times:
   synthesizer → END
 
-置信度不足（< 0.65）且反思次数 < 2：
-  synthesizer → reflector → analyst → synthesizer（循环）
+Confidence < 0.65 and reflection count < 2:
+  synthesizer → reflector → analyst → synthesizer (loop)
 
-节点职责：
-- planner：解析 ticker，获取公司名称
-- data_fetcher：并行拉取市场数据、财务三表、新闻（asyncio.gather）
-- technical_analyst：RSI / MACD / 布林带 / 均线（纯量化，无 LLM）
-- peer_benchmarker：同行业估值对比
-- analyst：5步多跳推理（Step1/2/3 并行），支持反思建议注入
-- synthesizer：结构化输出 StockRecommendation
-- reflector：自我反思，生成针对性改进建议
+Node responsibilities:
+- planner: resolve ticker, fetch company name
+- data_fetcher: parallel fetch of market data, financial statements, news (asyncio.gather)
+- technical_analyst: RSI / MACD / Bollinger Bands / moving averages (pure quant, no LLM)
+- peer_benchmarker: peer industry valuation comparison
+- analyst: 5-step multi-hop reasoning (Steps 1/2/3 in parallel), supports reflection injection
+- synthesizer: structured output StockRecommendation
+- reflector: self-reflection, generates targeted improvement suggestions
 """
 import logging
 
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 def planner_node(state: StockAnalysisState) -> dict:
-    """解析公司名称/ticker，获取标准化公司名，添加开始事件。"""
+    """Resolve company name/ticker, fetch canonical company name, emit start event."""
     from ticker_resolver import company_name_to_ticker
 
     raw    = state.get("ticker") or state.get("company_name") or "AAPL"
@@ -52,7 +52,7 @@ def planner_node(state: StockAnalysisState) -> dict:
     events.append({
         "event_type": "agent_start",
         "node": "planner",
-        "message": f"开始分析：{company_name}（{ticker}）",
+        "message": f"Starting analysis: {company_name} ({ticker})",
         "data": {"ticker": ticker, "company": company_name},
     })
 
@@ -65,9 +65,9 @@ def planner_node(state: StockAnalysisState) -> dict:
 
 def route_after_synthesizer(state: StockAnalysisState) -> str:
     """
-    置信度 >= 0.65 → 直接结束
-    已反思 >= 2 次 → 强制结束（安全阀）
-    否则 → 进入 reflector 触发深度重分析
+    Confidence >= 0.65 → end directly
+    Reflection count >= 2 → force end (safety valve)
+    Otherwise → enter reflector for deep re-analysis
     """
     rec        = state.get("recommendation") or {}
     confidence = rec.get("confidence", 1.0)

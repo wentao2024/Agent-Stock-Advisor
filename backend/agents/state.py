@@ -4,48 +4,48 @@ from typing_extensions import TypedDict
 
 class StockAnalysisState(TypedDict, total=False):
     """
-    LangGraph 共享状态
-    total=False → 所有字段均为可选（防止 KeyError）
+    LangGraph shared state.
+    total=False → all fields are optional (prevents KeyError)
     """
-    # 输入
+    # Inputs
     ticker: str
     company_name: str
     horizon: str
 
-    # 消息（直接调用方式下保持空列表）
+    # Messages (kept as empty list when using direct invocation)
     messages: list
 
-    # 数据收集结果
+    # Data collection results
     price_data: dict
     financial_statements: dict
     key_metrics: dict
     recent_news: list
 
-    # 技术分析（technical_analyst 节点输出）
+    # Technical analysis (output from technical_analyst node)
     technical_analysis: dict
 
-    # 同行对比（peer_benchmarker 节点输出）
+    # Peer comparison (output from peer_benchmarker node)
     peer_comparison: dict
 
-    # 多跳推理中间产物
+    # Multi-hop reasoning intermediate outputs
     revenue_analysis: str
     margin_analysis: str
     balance_sheet_analysis: str
     valuation_analysis: str
     risk_synthesis: str
 
-    # 流程控制
+    # Flow control
     data_fetch_complete: bool
     analysis_complete: bool
     confidence_score: float
 
-    # 输出
+    # Output
     recommendation: Optional[dict]
     error: Optional[str]
 
-    # Reflection loop（自我反思）
+    # Reflection loop (self-critique)
     reflection_count: int
     reflection_critique: str
 
-    # SSE 事件日志
+    # SSE event log
     events: list

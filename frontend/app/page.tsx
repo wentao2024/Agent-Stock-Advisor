@@ -99,11 +99,11 @@ const DEMOS = ["Apple", "Microsoft", "NVIDIA", "Tesla", "Meta", "Amazon", "Googl
 type RecType = "STRONG_BUY" | "BUY" | "HOLD" | "SELL" | "STRONG_SELL";
 
 const REC: Record<RecType, { color: string; bg: string; border: string; label: string; grad: string }> = {
-  STRONG_BUY:  { color: "#10b981", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.25)", label: "强烈买入", grad: "linear-gradient(135deg,#10b981,#059669)" },
-  BUY:         { color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)",  label: "买入",     grad: "linear-gradient(135deg,#34d399,#10b981)" },
-  HOLD:        { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)", label: "持有",     grad: "linear-gradient(135deg,#f59e0b,#d97706)" },
-  SELL:        { color: "#f87171", bg: "rgba(248,113,113,0.08)",border: "rgba(248,113,113,0.2)", label: "卖出",     grad: "linear-gradient(135deg,#f87171,#ef4444)" },
-  STRONG_SELL: { color: "#ef4444", bg: "rgba(239,68,68,0.08)",  border: "rgba(239,68,68,0.25)", label: "强烈卖出", grad: "linear-gradient(135deg,#ef4444,#dc2626)" },
+  STRONG_BUY:  { color: "#10b981", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.25)", label: "Strong Buy",  grad: "linear-gradient(135deg,#10b981,#059669)" },
+  BUY:         { color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)",  label: "Buy",         grad: "linear-gradient(135deg,#34d399,#10b981)" },
+  HOLD:        { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)", label: "Hold",        grad: "linear-gradient(135deg,#f59e0b,#d97706)" },
+  SELL:        { color: "#f87171", bg: "rgba(248,113,113,0.08)",border: "rgba(248,113,113,0.2)", label: "Sell",        grad: "linear-gradient(135deg,#f87171,#ef4444)" },
+  STRONG_SELL: { color: "#ef4444", bg: "rgba(239,68,68,0.08)",  border: "rgba(239,68,68,0.25)", label: "Strong Sell", grad: "linear-gradient(135deg,#ef4444,#dc2626)" },
 };
 
 const NODE_ICON: Record<string, React.ReactNode> = {
@@ -151,7 +151,7 @@ export default function App() {
     const n = (name || input).trim();
     if (!n) return;
 
-    // 取消上一次未完成的请求
+    // Cancel any in-progress request
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -198,7 +198,7 @@ export default function App() {
     try {
       await downloadReport(input.trim() || rec.company_name);
     } catch (e: any) {
-      showNotif("error", `下载失败: ${e.message}`);
+      showNotif("error", `Download failed: ${e.message}`);
     } finally {
       setDownloading(false);
     }
@@ -210,9 +210,9 @@ export default function App() {
     setIndexing(true);
     try {
       const r = await indexCompany(n);
-      showNotif("success", `索引完成：${r.ticker} — 写入 ${r.chunks} 个文本块（共 ${r.chroma_total} 条）`);
+      showNotif("success", `Index complete: ${r.ticker} — wrote ${r.chunks} chunks (${r.chroma_total} total)`);
     } catch (e: any) {
-      showNotif("error", `索引失败: ${e.message}`);
+      showNotif("error", `Index failed: ${e.message}`);
     } finally {
       setIndexing(false);
     }
@@ -223,18 +223,18 @@ export default function App() {
   // ── Metrics Data ──────────────────────────────────────────
 
   const mData = rec ? [
-    { label: "当前股价", val: usd(rec.metrics.current_price) },
-    { label: "52周高",   val: usd(rec.metrics.price_52w_high) },
-    { label: "52周低",   val: usd(rec.metrics.price_52w_low) },
-    { label: "市值",     val: rec.metrics.market_cap_b ? `$${rec.metrics.market_cap_b.toFixed(1)}B` : "—" },
-    { label: "P/E (TTM)", val: num(rec.metrics.pe_ratio) },
-    { label: "远期 P/E", val: num(rec.metrics.forward_pe) },
-    { label: "营收增长", val: pct(rec.metrics.revenue_growth_yoy), color: isPos(rec.metrics.revenue_growth_yoy) ? "#10b981" : "#ef4444", sub: "YoY" },
-    { label: "毛利率",   val: pct(rec.metrics.gross_margin) },
-    { label: "净利率",   val: pct(rec.metrics.net_margin) },
-    { label: "ROE",      val: pct(rec.metrics.roe) },
-    { label: "负债权益比", val: num(rec.metrics.debt_to_equity) },
-    { label: "自由现金流", val: rec.metrics.free_cash_flow_b ? `$${rec.metrics.free_cash_flow_b.toFixed(1)}B` : "—" },
+    { label: "Current Price",   val: usd(rec.metrics.current_price) },
+    { label: "52W High",        val: usd(rec.metrics.price_52w_high) },
+    { label: "52W Low",         val: usd(rec.metrics.price_52w_low) },
+    { label: "Market Cap",      val: rec.metrics.market_cap_b ? `$${rec.metrics.market_cap_b.toFixed(1)}B` : "—" },
+    { label: "P/E (TTM)",       val: num(rec.metrics.pe_ratio) },
+    { label: "Forward P/E",     val: num(rec.metrics.forward_pe) },
+    { label: "Revenue Growth",  val: pct(rec.metrics.revenue_growth_yoy), color: isPos(rec.metrics.revenue_growth_yoy) ? "#10b981" : "#ef4444", sub: "YoY" },
+    { label: "Gross Margin",    val: pct(rec.metrics.gross_margin) },
+    { label: "Net Margin",      val: pct(rec.metrics.net_margin) },
+    { label: "ROE",             val: pct(rec.metrics.roe) },
+    { label: "Debt/Equity",     val: num(rec.metrics.debt_to_equity) },
+    { label: "Free Cash Flow",  val: rec.metrics.free_cash_flow_b ? `$${rec.metrics.free_cash_flow_b.toFixed(1)}B` : "—" },
   ] : [];
 
   return (
@@ -260,7 +260,7 @@ export default function App() {
             <span className="search-icon"><IconSearch /></span>
             <input
               className="search-input"
-              placeholder="输入公司名称，如 Apple / Microsoft / 英伟达"
+              placeholder="Enter company name, e.g. Apple / Microsoft / NVIDIA"
               value={input}
               onChange={e => setInput(e.target.value)}
               onBlur={e => handleBlur(e.target.value)}
@@ -270,25 +270,25 @@ export default function App() {
             {ticker && <span className="ticker-pill">{ticker}</span>}
           </div>
 
-          {/* 投资期限选择 */}
+          {/* Investment horizon selector */}
           <select
             className="horizon-select"
             value={horizon}
             onChange={e => setHorizon(e.target.value as "short" | "medium" | "long")}
-            title="投资期限"
+            title="Investment Horizon"
           >
-            <option value="short">短线</option>
-            <option value="medium">中线</option>
-            <option value="long">长线</option>
+            <option value="short">Short</option>
+            <option value="medium">Medium</option>
+            <option value="long">Long</option>
           </select>
 
           <button className="btn-primary" onClick={() => run()} disabled={!input.trim()}>
             {loading ? <IconLoader cls="spin" /> : <IconSearch />}
-            {loading ? "分析中..." : "分析"}
+            {loading ? "Analyzing..." : "Analyze"}
           </button>
-          <button className="btn-ghost" onClick={doIndex} disabled={indexing || !input.trim()} title="预先索引数据到 ChromaDB">
+          <button className="btn-ghost" onClick={doIndex} disabled={indexing || !input.trim()} title="Pre-index data to ChromaDB">
             {indexing ? <IconLoader cls="spin" /> : <IconDatabase />}
-            {indexing ? "索引中..." : "索引"}
+            {indexing ? "Indexing..." : "Index"}
           </button>
         </div>
 
@@ -304,13 +304,13 @@ export default function App() {
         <aside className="agent-panel">
           <div className="panel-header">
             <span className={`panel-dot ${loading ? "" : "idle"}`} />
-            Agent 推理日志
+            Agent Reasoning Log
           </div>
           <div className="log-scroll" ref={evRef}>
             {events.length === 0 && !loading && (
               <div className="log-empty">
                 <div className="log-empty-icon">🤖</div>
-                <div>输入公司名称后<br />这里实时展示 AI 推理过程</div>
+                <div>Enter a company name to<br />see AI reasoning in real time</div>
               </div>
             )}
             {events.map((ev, i) => {
@@ -333,12 +333,12 @@ export default function App() {
             {loading && (
               <div className="log-loading">
                 <IconLoader cls="spin" />
-                <span className="pulse">Agent 思考中...</span>
+                <span className="pulse">Agent thinking...</span>
               </div>
             )}
           </div>
 
-          {/* Token 计数 */}
+          {/* Token counter */}
           {tokens.total > 0 && (
             <div className="token-bar">
               <span className="token-label">Tokens</span>
@@ -358,10 +358,10 @@ export default function App() {
           {!rec ? (
             <div className="empty-state">
               <div className="empty-hero">📊</div>
-              <h1 className="empty-title">AI 股票分析助手</h1>
+              <h1 className="empty-title">AI Stock Analysis Assistant</h1>
               <p className="empty-sub">
-                输入任意公司名称，系统自动调用 LangGraph 多 Agent，
-                完成 5 步多跳推理，生成结构化投资建议报告
+                Enter any company name. The system automatically invokes LangGraph multi-agent,
+                completes 5-step multi-hop reasoning, and generates a structured investment recommendation report.
               </p>
               <div className="empty-tags">
                 {["LangGraph", "Technical Analysis", "Peer Benchmarking", "Multi-hop Reasoning", "ChromaDB RAG"].map(t => (
@@ -393,7 +393,7 @@ export default function App() {
                 </div>
 
                 <div className="confidence-row">
-                  <span>置信度</span>
+                  <span>Confidence</span>
                   <div className="conf-track">
                     <div className="conf-fill" style={{ width: `${rec.confidence * 100}%`, background: cfg.grad }} />
                   </div>
@@ -406,12 +406,12 @@ export default function App() {
 
                 <div className="price-row">
                   <div className="price-item">
-                    <span className="price-label">当前价格</span>
+                    <span className="price-label">Current Price</span>
                     <span className="price-value">${rec.current_price.toFixed(2)}</span>
                   </div>
                   {rec.target_price_high && (
                     <div className="price-item">
-                      <span className="price-label">目标价区间</span>
+                      <span className="price-label">Target Range</span>
                       <span className="price-value" style={{ color: cfg.color }}>
                         ${rec.target_price_low?.toFixed(0)} – ${rec.target_price_high?.toFixed(0)}
                       </span>
@@ -419,7 +419,7 @@ export default function App() {
                   )}
                   {rec.upside_pct != null && (
                     <div className="price-item">
-                      <span className="price-label">潜在空间</span>
+                      <span className="price-label">Upside</span>
                       <span className="price-value" style={{ color: rec.upside_pct >= 0 ? "#10b981" : "#ef4444" }}>
                         {rec.upside_pct >= 0 ? "+" : ""}{rec.upside_pct.toFixed(1)}%
                       </span>
@@ -428,7 +428,7 @@ export default function App() {
                   <div className="price-actions">
                     <button className="btn-ghost" onClick={doDownload} disabled={downloading}>
                       {downloading ? <IconLoader cls="spin" /> : <IconDownload />}
-                      {downloading ? "生成中..." : "下载报告"}
+                      {downloading ? "Generating..." : "Download Report"}
                     </button>
                   </div>
                 </div>
@@ -436,9 +436,9 @@ export default function App() {
 
               {/* Tabs */}
               <div className="tabs">
-                <button className={`tab ${tab === "chain" ? "active" : ""}`} onClick={() => setTab("chain")}>多跳推理链</button>
-                <button className={`tab ${tab === "metrics" ? "active" : ""}`} onClick={() => setTab("metrics")}>财务指标</button>
-                <button className={`tab ${tab === "risks" ? "active" : ""}`} onClick={() => setTab("risks")}>多空分析</button>
+                <button className={`tab ${tab === "chain" ? "active" : ""}`} onClick={() => setTab("chain")}>Reasoning Chain</button>
+                <button className={`tab ${tab === "metrics" ? "active" : ""}`} onClick={() => setTab("metrics")}>Financials</button>
+                <button className={`tab ${tab === "risks" ? "active" : ""}`} onClick={() => setTab("risks")}>Bull / Bear</button>
               </div>
 
               {/* Reasoning Chain */}
@@ -459,7 +459,7 @@ export default function App() {
                   ))}
                   {rec.sources?.length > 0 && (
                     <div style={{ fontSize: "11px", color: "var(--text3)", paddingTop: "8px" }}>
-                      数据来源：{rec.sources.map(s => s.name).join(" · ")}
+                      Data Sources: {rec.sources.map(s => s.name).join(" · ")}
                     </div>
                   )}
                 </div>
@@ -483,7 +483,7 @@ export default function App() {
                 <>
                   <div className="bull-bear">
                     <div className="side bull">
-                      <div className="side-title"><IconTrendUp />看多理由</div>
+                      <div className="side-title"><IconTrendUp />Bull Case</div>
                       {rec.bull_case.map((b, i) => (
                         <div key={i} className="case-item">
                           <div className="case-dot" />
@@ -492,7 +492,7 @@ export default function App() {
                       ))}
                     </div>
                     <div className="side bear">
-                      <div className="side-title"><IconTrendDown />看空理由</div>
+                      <div className="side-title"><IconTrendDown />Bear Case</div>
                       {rec.bear_case.map((b, i) => (
                         <div key={i} className="case-item">
                           <div className="case-dot" />
@@ -502,7 +502,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="risks-card">
-                    <div className="risks-title"><IconShield />关键风险</div>
+                    <div className="risks-title"><IconShield />Key Risks</div>
                     {rec.key_risks.map((r, i) => (
                       <div key={i} className="risk-item">
                         <span className="risk-icon"><IconAlert /></span>
@@ -512,7 +512,7 @@ export default function App() {
                   </div>
                   {rec.catalysts?.length > 0 && (
                     <div className="risks-card">
-                      <div className="risks-title"><IconZap />近期催化剂</div>
+                      <div className="risks-title"><IconZap />Near-term Catalysts</div>
                       {rec.catalysts.map((c, i) => (
                         <div key={i} className="risk-item">
                           <span className="catalyst-icon"><IconCheck /></span>

@@ -1,8 +1,8 @@
 """
-Peer Benchmarker 节点 — 同行业估值对比
+Peer Benchmarker node — peer industry valuation comparison
 
-对比目标公司与同行在 PE、营收增长、净利率等关键指标上的差异
-使用已定义的 get_peer_comparison 工具（之前未被调用）
+Compares the target company against peers on key metrics: P/E, revenue growth, net margin.
+Uses the pre-defined get_peer_comparison tool.
 """
 import logging
 from typing import Optional
@@ -29,7 +29,7 @@ def peer_benchmarker_node(state: StockAnalysisState) -> dict:
     events.append({
         "event_type": "agent_start",
         "node": "peer_benchmarker",
-        "message": f"获取同行业对标数据：{company}（{ticker}）",
+        "message": f"Fetching peer industry benchmark data: {company} ({ticker})",
         "data": {"ticker": ticker},
     })
 
@@ -41,7 +41,7 @@ def peer_benchmarker_node(state: StockAnalysisState) -> dict:
         "peer_avg_revenue_growth": None,
         "peer_avg_net_margin": None,
         "vs_peers": {},
-        "summary": "无同行数据可用",
+        "summary": "No peer data available",
     }
 
     try:
@@ -51,11 +51,11 @@ def peer_benchmarker_node(state: StockAnalysisState) -> dict:
         if not peers:
             events.append({
                 "event_type": "tool_result", "node": "peer_benchmarker",
-                "message": "未找到同行数据（不影响主体分析）", "data": {},
+                "message": "No peer data found (does not affect main analysis)", "data": {},
             })
             return {"peer_comparison": default, "events": events}
 
-        # 计 算 同 行 均 值
+        # Compute peer averages
         valid_pe     = [p["pe"] for p in peers if p.get("pe") is not None]
         valid_growth = [p["revenue_growth"] for p in peers if p.get("revenue_growth") is not None]
         valid_margin = [p["net_margin"] for p in peers if p.get("net_margin") is not None]
@@ -75,21 +75,21 @@ def peer_benchmarker_node(state: StockAnalysisState) -> dict:
             premium = (own_pe - peer_avg_pe) / peer_avg_pe
             vs_peers["pe_vs_peers"] = round(premium, 4)
             if premium > 0.2:
-                summary_parts.append(f"PE溢价{premium:.0%}高于同行均值({peer_avg_pe:.1f}x)")
+                summary_parts.append(f"P/E premium {premium:.0%} above peer avg ({peer_avg_pe:.1f}x)")
             elif premium < -0.2:
-                summary_parts.append(f"PE折价{abs(premium):.0%}低于同行均值({peer_avg_pe:.1f}x)")
+                summary_parts.append(f"P/E discount {abs(premium):.0%} below peer avg ({peer_avg_pe:.1f}x)")
             else:
-                summary_parts.append(f"PE与同行相近（{own_pe:.1f}x vs 均值{peer_avg_pe:.1f}x）")
+                summary_parts.append(f"P/E in line with peers ({own_pe:.1f}x vs avg {peer_avg_pe:.1f}x)")
 
         if own_growth is not None and peer_avg_growth is not None:
             vs_peers["growth_vs_peers"] = round(own_growth - peer_avg_growth, 4)
-            label = "高于" if own_growth > peer_avg_growth else "低于"
-            summary_parts.append(f"营收增长{label}同行（{own_growth:.1%} vs {peer_avg_growth:.1%}）")
+            label = "above" if own_growth > peer_avg_growth else "below"
+            summary_parts.append(f"Revenue growth {label} peers ({own_growth:.1%} vs {peer_avg_growth:.1%})")
 
         if own_margin is not None and peer_avg_margin is not None:
             vs_peers["margin_vs_peers"] = round(own_margin - peer_avg_margin, 4)
-            label = "行业领先" if own_margin > peer_avg_margin else "低于行业均值"
-            summary_parts.append(f"净利率{label}（{own_margin:.1%} vs {peer_avg_margin:.1%}）")
+            label = "industry leading" if own_margin > peer_avg_margin else "below industry avg"
+            summary_parts.append(f"Net margin {label} ({own_margin:.1%} vs {peer_avg_margin:.1%})")
 
         result = {
             "sector": comparison.get("sector", ""),
@@ -99,16 +99,16 @@ def peer_benchmarker_node(state: StockAnalysisState) -> dict:
             "peer_avg_revenue_growth": peer_avg_growth,
             "peer_avg_net_margin": peer_avg_margin,
             "vs_peers": vs_peers,
-            "summary": "；".join(summary_parts) if summary_parts else "无有效对比数据",
+            "summary": "; ".join(summary_parts) if summary_parts else "No valid comparison data",
         }
 
-        peer_names = "、".join(p.get("ticker", "") for p in peers[:3])
+        peer_names = ", ".join(p.get("ticker", "") for p in peers[:3])
         events.append({
             "event_type": "reasoning_step",
             "node": "peer_benchmarker",
-            "message": f"同行对比完成：{peer_names}",
+            "message": f"Peer comparison complete: {peer_names}",
             "data": {
-                "step": 0, "title": "同行对比",
+                "step": 0, "title": "Peer Comparison",
                 "finding": result["summary"],
             },
         })
@@ -116,9 +116,9 @@ def peer_benchmarker_node(state: StockAnalysisState) -> dict:
         return {"peer_comparison": result, "events": events}
 
     except Exception as e:
-        logger.error(f"peer_benchmarker 失败: {e}")
+        logger.error(f"peer_benchmarker failed: {e}")
         events.append({
             "event_type": "tool_result", "node": "peer_benchmarker",
-            "message": "同行对比失败（不影响主体分析）", "data": {},
+            "message": "Peer comparison failed (does not affect main analysis)", "data": {},
         })
         return {"peer_comparison": default, "events": events}

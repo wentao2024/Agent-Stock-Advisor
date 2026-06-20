@@ -1,8 +1,8 @@
 """
-Data Fetcher 节点 — 异步并行版
+Data Fetcher node — async parallel version
 
-使用 asyncio.gather + asyncio.to_thread 并行调用 4 个 yfinance 工具，
-将顺序执行的 ~8s 延迟压缩到 ~2s（取最慢单次调用时间）。
+Uses asyncio.gather + asyncio.to_thread to call 4 yfinance tools in parallel,
+compressing sequential ~8s latency down to ~2s (limited by the slowest single call).
 """
 import asyncio
 import logging
@@ -26,11 +26,11 @@ async def data_fetcher_node(state: StockAnalysisState) -> dict:
     events.append({
         "event_type": "agent_start",
         "node":       "data_fetcher",
-        "message":    f"并行拉取 {company}（{ticker}）市场数据（4 路并发）...",
+        "message":    f"Fetching {company} ({ticker}) market data in parallel (4 concurrent streams)...",
         "data":       {"ticker": ticker, "parallel": True},
     })
 
-    # ── 4 路并行：核心指标 / 股价历史 / 财务三表 / 新闻 ──────────
+    # ── 4-way parallel: key metrics / price history / financials / news ──
     raw_metrics, raw_price, raw_financials, raw_news = await asyncio.gather(
         asyncio.to_thread(get_key_metrics.invoke,          {"ticker": ticker}),
         asyncio.to_thread(get_stock_price_history.invoke,  {"ticker": ticker, "period": "1y"}),
@@ -39,22 +39,22 @@ async def data_fetcher_node(state: StockAnalysisState) -> dict:
         return_exceptions=True,
     )
 
-    # ── 处理结果（统一错误降级逻辑）────────────────────────────
+    # ── Process results (unified error fallback logic) ────────────
     def _safe_dict(r, label: str) -> dict:
         if isinstance(r, Exception):
-            logger.error(f"{label} 并发调用异常: {r}")
+            logger.error(f"{label} concurrent call error: {r}")
             return {}
         if isinstance(r, dict) and "error" in r:
-            logger.warning(f"{label} 返回错误: {r['error']}")
+            logger.warning(f"{label} returned error: {r['error']}")
             return {}
         return r or {}
 
     def _safe_list(r, label: str) -> list:
         if isinstance(r, Exception):
-            logger.error(f"{label} 并发调用异常: {r}")
+            logger.error(f"{label} concurrent call error: {r}")
             return []
         if isinstance(r, list) and r and "error" in r[0]:
-            logger.warning(f"{label} 返回错误: {r[0]['error']}")
+            logger.warning(f"{label} returned error: {r[0]['error']}")
             return []
         return r or []
 
@@ -66,22 +66,22 @@ async def data_fetcher_node(state: StockAnalysisState) -> dict:
         if n.get("title") and n.get("published", "").startswith("197") is False
     ]
 
-    # ── 并发完成后汇报 ──────────────────────────────────────────
+    # ── Report after parallel fetch completes ─────────────────────
     if key_metrics:
         events.append({
             "event_type": "tool_result", "node": "data_fetcher",
             "message": (
-                f"4路数据拉取完成 — "
+                f"4-stream fetch complete — "
                 f"PE={key_metrics.get('pe_ratio','N/A')} "
-                f"股价=${price_data.get('current_price','N/A')} "
-                f"新闻{len(recent_news)}条"
+                f"Price=${price_data.get('current_price','N/A')} "
+                f"News={len(recent_news)} items"
             ),
             "data": {},
         })
     else:
         events.append({
             "event_type": "tool_result", "node": "data_fetcher",
-            "message": "部分数据拉取失败，降级继续分析", "data": {},
+            "message": "Some data fetch failed, continuing with degraded data", "data": {},
         })
 
     return {
