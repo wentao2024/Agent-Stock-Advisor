@@ -13,12 +13,15 @@ class Settings(BaseSettings):
     langchain_project: str = "stock-advisor"
     langchain_endpoint: str = "https://api.smith.langchain.com"
 
+    
     # ── Redis (LangGraph Checkpointer, optional) ──────────────
     redis_url: str = ""
+    
 
     # ── PostgreSQL (historical report persistence, optional) ──
     database_url: str = ""
 
+    
     # ── CORS ──────────────────────────────────────────────────
     cors_origins: str = "http://localhost:3000"
 
