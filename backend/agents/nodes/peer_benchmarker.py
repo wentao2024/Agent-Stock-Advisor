@@ -12,13 +12,11 @@ from agents.tools.market_data import get_peer_comparison
 
 logger = logging.getLogger(__name__)
 
-
 def _f(v) -> Optional[float]:
     try:
         return float(v) if v is not None else None
     except Exception:
         return None
-
 
 def peer_benchmarker_node(state: StockAnalysisState) -> dict:
     ticker      = state.get("ticker", "UNKNOWN")
