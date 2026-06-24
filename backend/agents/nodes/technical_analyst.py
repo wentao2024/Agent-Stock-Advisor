@@ -12,7 +12,6 @@ from agents.state import StockAnalysisState
 
 logger = logging.getLogger(__name__)
 
-
 def _ema(data: list, period: int) -> list:
     if not data:
         return []
@@ -21,7 +20,6 @@ def _ema(data: list, period: int) -> list:
     for v in data[1:]:
         result.append(v * k + result[-1] * (1 - k))
     return result
-
 
 def _rsi(closes: list, period: int = 14) -> Optional[float]:
     if len(closes) < period + 1:
@@ -38,7 +36,6 @@ def _rsi(closes: list, period: int = 14) -> Optional[float]:
         return 100.0
     return round(100 - (100 / (1 + avg_gain / avg_loss)), 2)
 
-
 def _macd(closes: list, fast=12, slow=26, signal=9):
     if len(closes) < slow:
         return None, None, None
@@ -50,7 +47,6 @@ def _macd(closes: list, fast=12, slow=26, signal=9):
     sig_line = _ema(macd_line, signal)
     histogram = macd_line[-1] - sig_line[-1]
     return round(macd_line[-1], 4), round(sig_line[-1], 4), round(histogram, 4)
-
 
 def _bollinger(closes: list, period: int = 20, n_std: float = 2.0):
     if len(closes) < period:
