@@ -16,14 +16,12 @@ logger = logging.getLogger(__name__)
 
 _llm: ChatOpenAI | None = None
 
-
 def _get_llm() -> ChatOpenAI:
     global _llm
     if _llm is None:
         s = get_settings()
         _llm = ChatOpenAI(model=s.openai_model, api_key=s.openai_api_key, temperature=0)
     return _llm
-
 
 SYS = """You are a chief equity analyst at an investment bank. Generate a complete structured investment report based on the analysis below.
 
@@ -38,7 +36,6 @@ Requirements:
 - Target price derived from P/E/DCF reasoning and analyst consensus
 - All text content must be in English
 """
-
 
 async def synthesizer_node(state: StockAnalysisState) -> dict:
     ticker     = state.get("ticker", "UNKNOWN")
