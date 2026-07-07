@@ -23,6 +23,7 @@ planner → data_fetcher → technical_analyst → peer_benchmarker → analyst 
 
 Each node streams its progress to the frontend via **Server-Sent Events**, so you watch the AI reason in real time — from raw data fetching through 5-step multi-hop analysis to the final structured report.
 
+
 ## Features
 
 - **Multi-hop reasoning** — 5-step analysis chain: revenue → margins → balance sheet → valuation → risk synthesis; Steps 1–3 run in parallel with `asyncio.gather`
