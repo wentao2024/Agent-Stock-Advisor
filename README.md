@@ -1,6 +1,5 @@
 # Agent Stock Advisor
 
-
 > AI-powered stock analysis system built with LangGraph multi-agent architecture. Input any company name, get a structured investment report with real-time streaming reasoning.
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
