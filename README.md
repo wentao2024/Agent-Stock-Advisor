@@ -2,7 +2,6 @@
 
 > AI-powered stock analysis system built with LangGraph multi-agent architecture. Input any company name, get a structured investment report with real-time streaming reasoning.
 
-
 ![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
 ![LangGraph](https://img.shields.io/badge/LangGraph-0.2-green)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110-teal?logo=fastapi)
