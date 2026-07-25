@@ -11,7 +11,6 @@
 ## Overview
 
 
-
 Agent Stock Advisor runs a **7-node LangGraph pipeline** for every analysis request:
 
 ```
