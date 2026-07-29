@@ -6,6 +6,7 @@ Stock Advisor API v4
 - Long-term memory: PostgreSQL (historical analysis report persistence)
 - Output: SSE streaming + downloadable txt report
 """
+
 import contextlib
 import json
 import logging
