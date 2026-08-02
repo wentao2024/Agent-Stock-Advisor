@@ -1,8 +1,6 @@
 """
 LangGraph graph
 
-
-
 Normal path:
   START → planner → data_fetcher → technical_analyst → peer_benchmarker → analyst → synthesizer
 
