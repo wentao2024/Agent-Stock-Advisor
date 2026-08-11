@@ -2,8 +2,6 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-
-
 class FinancialMetrics(BaseModel):
     current_price: float = 0.0
     price_52w_high: Optional[float] = None
