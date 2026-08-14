@@ -1,7 +1,6 @@
 from typing import Optional
 from typing_extensions import TypedDict
 
-
 class StockAnalysisState(TypedDict, total=False):
     """
     LangGraph shared state.
