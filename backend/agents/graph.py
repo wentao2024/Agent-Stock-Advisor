@@ -8,6 +8,7 @@ Confidence >= 0.65 or already reflected 2 times:
   synthesizer → END
 
 
+
 Confidence < 0.65 and reflection count < 2:
   synthesizer → reflector → analyst → synthesizer (loop)
 
