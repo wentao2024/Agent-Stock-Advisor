@@ -1,15 +1,14 @@
 """
 LangGraph graph
+
 Normal path:
   START → planner → data_fetcher → technical_analyst → peer_benchmarker → analyst → synthesizer
 
 Confidence >= 0.65 or already reflected 2 times:
   synthesizer → END
 
-
 Confidence < 0.65 and reflection count < 2:
   synthesizer → reflector → analyst → synthesizer (loop)
-
 
 Node responsibilities:
 - planner: resolve ticker, fetch company name
