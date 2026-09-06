@@ -4,6 +4,7 @@ Data Fetcher node — async parallel version
 Uses asyncio.gather + asyncio.to_thread to call 4 yfinance tools in parallel,
 compressing sequential ~8s latency down to ~2s (limited by the slowest single call).
 """
+
 import asyncio
 import logging
 
