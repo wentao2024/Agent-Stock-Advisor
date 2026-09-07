@@ -5,7 +5,6 @@ Compares the target company against peers on key metrics: P/E, revenue growth, n
 Uses the pre-defined get_peer_comparison tool.
 """
 
-
 import logging
 from typing import Optional
 
