@@ -7,6 +7,7 @@ Uses the pre-defined get_peer_comparison tool.
 import logging
 from typing import Optional
 
+
 from agents.state import StockAnalysisState
 from agents.tools.market_data import get_peer_comparison
 
