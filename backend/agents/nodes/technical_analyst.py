@@ -4,7 +4,6 @@ Technical Analyst node — pure quantitative indicator calculation
 Computes from pre-fetched OHLCV data: RSI, MACD, Bollinger Bands, moving average system.
 No LLM calls; results are fully objective and reproducible.
 """
-
 import logging
 import math
 from typing import Optional
