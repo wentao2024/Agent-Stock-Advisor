@@ -6,7 +6,6 @@ Uses the pre-defined get_peer_comparison tool.
 """
 
 
-
 import logging
 from typing import Optional
 
