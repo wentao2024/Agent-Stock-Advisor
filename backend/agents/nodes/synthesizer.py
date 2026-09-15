@@ -3,7 +3,6 @@ Synthesizer node: with_structured_output → StockRecommendation
 Integrates fundamental analysis + technical indicators + peer comparison into a complete structured report.
 """
 
-
 import logging
 from datetime import date
 
