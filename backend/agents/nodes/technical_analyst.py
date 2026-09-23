@@ -6,8 +6,6 @@ No LLM calls; results are fully objective and reproducible.
 """
 
 
-
-
 import logging
 import math
 from typing import Optional
